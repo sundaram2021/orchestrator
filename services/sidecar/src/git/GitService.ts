@@ -1,4 +1,4 @@
-import type { GitStatus } from "@orchestrator/contracts";
+import type { GitBranches, GitFile, GitStatus } from "@orchestrator/contracts";
 import { runCapture } from "../util/process.js";
 
 export type { GitStatus };
@@ -16,16 +16,21 @@ export class GitService {
   async status(): Promise<GitStatus> {
     const porcelain = await runCapture("git", ["status", "--porcelain"], { cwd: this.cwd });
     if (porcelain.failed) {
-      return { available: false, branch: "", changed: 0, staged: 0, unstaged: 0 };
+      return { available: false, branch: "", changed: 0, staged: 0, unstaged: 0, files: [] };
     }
     const lines = porcelain.stdout.split(/\r?\n/).filter(Boolean);
     let staged = 0;
     let unstaged = 0;
+    const files: GitFile[] = [];
     for (const line of lines) {
       const x = line[0] ?? " ";
       const y = line[1] ?? " ";
+      let p = line.slice(3).trim();
+      if (p.includes(" -> ")) p = p.split(" -> ").pop()?.trim() ?? p;
+      if (p.startsWith('"') && p.endsWith('"')) p = p.slice(1, -1);
       if (x !== " " && x !== "?") staged++;
       if (y !== " ") unstaged++;
+      files.push({ path: p, index: x, worktree: y });
     }
     return {
       available: true,
@@ -33,7 +38,41 @@ export class GitService {
       changed: lines.length,
       staged,
       unstaged,
+      files,
     };
+  }
+
+  async branches(): Promise<GitBranches> {
+    const res = await runCapture("git", ["branch", "--format=%(refname:short)"], { cwd: this.cwd });
+    const local = res.failed
+      ? []
+      : res.stdout
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+    return { current: await this.branch(), local };
+  }
+
+  async checkout(branch: string, force = false): Promise<{ ok: boolean; output: string }> {
+    const args = ["checkout"];
+    if (force) args.push("--force");
+    args.push(branch);
+    const res = await runCapture("git", args, { cwd: this.cwd, timeoutMs: 30_000 });
+    return { ok: !res.failed, output: `${res.stdout}${res.stderr}`.trim() };
+  }
+
+  async createPullRequest(options: {
+    title: string;
+    body?: string;
+    base?: string;
+  }): Promise<{ ok: boolean; output: string }> {
+    const args = ["pr", "create", "--title", options.title, "--body", options.body ?? ""];
+    if (options.base) args.push("--base", options.base);
+    const res = await runCapture("gh", args, { cwd: this.cwd, timeoutMs: 60_000 });
+    if (res.failed && /ENOENT|not recognized|not found/i.test(res.stderr)) {
+      return { ok: false, output: "GitHub CLI (gh) not found. Install it to open pull requests." };
+    }
+    return { ok: !res.failed, output: `${res.stdout}${res.stderr}`.trim() };
   }
 
   async diff(options: { path?: string; staged?: boolean } = {}): Promise<string> {

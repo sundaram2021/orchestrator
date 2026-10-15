@@ -73,6 +73,16 @@ export class RequestHandlers {
         return this.deps.git.commit(str(p.message));
       case "gitPush":
         return this.deps.git.push();
+      case "gitBranches":
+        return this.deps.git.branches();
+      case "gitCheckout":
+        return this.deps.git.checkout(str(p.branch), p.force === true);
+      case "gitCreatePr":
+        return this.deps.git.createPullRequest({
+          title: str(p.title),
+          body: typeof p.body === "string" ? p.body : undefined,
+          base: typeof p.base === "string" ? p.base : undefined,
+        });
       case "launchAntigravity": {
         const adapter = this.deps.adapters.get("antigravity");
         if (!adapter || !isLaunchable(adapter)) {

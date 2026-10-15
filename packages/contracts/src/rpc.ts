@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AppConfigSchema, ModelRefSchema } from "./config.js";
 import { DomainEventSchema } from "./events.js";
 import { ReadModelSchema } from "./readmodel.js";
-import { FileContentSchema, FileNodeSchema, GitStatusSchema } from "./files.js";
+import { FileContentSchema, FileNodeSchema, GitBranchesSchema, GitStatusSchema } from "./files.js";
 
 export const CommandSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -44,6 +44,9 @@ export const METHOD_NAMES = [
   "gitStage",
   "gitCommit",
   "gitPush",
+  "gitBranches",
+  "gitCheckout",
+  "gitCreatePr",
   "launchAntigravity",
   "mcpCallTool",
 ] as const;
@@ -86,6 +89,12 @@ export interface MethodMap {
   gitStage: { params: { path?: string }; result: { ok: true } };
   gitCommit: { params: { message: string }; result: { ok: boolean; output: string } };
   gitPush: { params: undefined; result: { ok: boolean; output: string } };
+  gitBranches: { params: undefined; result: z.infer<typeof GitBranchesSchema> };
+  gitCheckout: { params: { branch: string; force?: boolean }; result: { ok: boolean; output: string } };
+  gitCreatePr: {
+    params: { title: string; body?: string; base?: string };
+    result: { ok: boolean; output: string };
+  };
   launchAntigravity: { params: undefined; result: { ok: boolean; detail: string } };
   mcpCallTool: {
     params: { server: string; tool: string; args: Record<string, unknown> };

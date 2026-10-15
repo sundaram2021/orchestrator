@@ -3,6 +3,7 @@
   import FileNodeView from "./FileNodeView.svelte";
 
   const git = $derived(session.git);
+  const branches = $derived(session.branches);
 
   type MenuTarget = { x: number; y: number; path: string; type: "file" | "dir" | "root" };
   let menu = $state<MenuTarget | null>(null);
@@ -90,11 +91,37 @@
       {/if}
     </div>
     {#if git?.available}
+      {#if branches && branches.local.length > 1}
+        <select class="branchselect" value={branches.current} onchange={(e) => void session.checkout(e.currentTarget.value)}>
+          {#each branches.local as b (b)}
+            <option value={b}>{b}</option>
+          {/each}
+        </select>
+      {/if}
+      {#if git.files.length > 0}
+        <div class="changelist">
+          {#each git.files as f (f.path)}
+            <div class="chg" class:sel={session.diffPath === f.path}>
+              <button class="chg-name" title={f.path} onclick={() => void session.openDiff(f.path)}>
+                <span class="chg-st">{f.index !== " " && f.index !== "?" ? f.index : "?"}</span>
+                {f.path.split("/").pop()}
+              </button>
+              {#if f.worktree !== " "}
+                <button class="chg-stage" title="Stage file" onclick={() => void session.stageFile(f.path)}>＋</button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
       <input class="search" bind:value={session.commitMessage} placeholder="Commit message…" />
       <div class="git-actions">
         <button class="btn ghost" onclick={() => void session.stageAll()}>Stage all</button>
         <button class="btn ghost" onclick={() => void session.push()}>Push</button>
         <button class="btn" disabled={!session.commitMessage.trim()} onclick={() => void session.commit()}>Commit</button>
+      </div>
+      <input class="search" bind:value={session.prTitle} placeholder="PR title…" />
+      <div class="git-actions">
+        <button class="btn ghost" disabled={!session.prTitle.trim()} onclick={() => void session.createPr()}>Open PR</button>
       </div>
     {/if}
   </div>
@@ -147,5 +174,61 @@
   }
   .ctx-item.danger {
     color: #e57373;
+  }
+  .branchselect {
+    margin: 6px 10px 0;
+    padding: 4px 6px;
+    background: var(--panel2, #202027);
+    color: var(--text, #e6e6e6);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 12px;
+  }
+  .changelist {
+    margin: 6px 0;
+    max-height: 160px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .chg {
+    display: flex;
+    align-items: center;
+  }
+  .chg.sel {
+    background: var(--hover, #26262c);
+  }
+  .chg-name {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 3px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text, #e6e6e6);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .chg-st {
+    color: var(--muted, #8a8a94);
+    font-family: monospace;
+  }
+  .chg-stage {
+    border: none;
+    background: transparent;
+    color: var(--muted, #8a8a94);
+    cursor: pointer;
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+  .chg-stage:hover {
+    color: var(--text, #e6e6e6);
   }
 </style>

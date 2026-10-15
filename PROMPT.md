@@ -120,11 +120,11 @@ the test fixture). Do not re-add it.
 10. **Retry and Fork.** ✅ `RetryThread`/`ForkThread` commands + `DiscardThread`/`MergeThread` + UI; dead `OpenCodeServer.fork()` removed (sibling re-run semantics instead).
 11. **Virtualize agent columns/history** for dozens of agents (windowing). ⬜ PENDING.
 
-### Phase 3 — Git & review flow
-12. **Code-apply accept/reject.** When an agent turn produces file changes, surface a diff with per-hunk accept/reject that writes to the worktree. (Pairs with worktrees.)
-13. **One-click PR.** Extend `GitService` with `createPullRequest` using `gh` (detect CLI; graceful error if absent). Add RPC + UI button after push.
-14. **Staged diff + per-file stage.** `gitDiff` already accepts `staged`; `gitStage` accepts a path — wire both in the UI.
-15. **Branch switch** (currently branch is display-only) — add a command with a safety check for dirty trees.
+### Phase 3 — Git & review flow — ✅ 13–15 DONE; 12 pending
+12. **Code-apply accept/reject.** When an agent turn produces file changes, surface a diff with per-hunk accept/reject that writes to the worktree. (Pairs with worktrees.) ⬜ PENDING.
+13. **One-click PR.** ✅ `GitService.createPullRequest` (shells `gh pr create`, graceful "gh not found" error) + `gitCreatePr` RPC + "Open PR" UI (title/body).
+14. **Staged diff + per-file stage.** ✅ `gitStatus` now returns a per-file `files` list; changed-file list in `FileTree` with per-file stage; staged/unstaged toggle in the editor diff bar.
+15. **Branch switch.** ✅ `gitBranches` + `gitCheckout` RPC + branch `<select>` in `FileTree`; dirty trees are refused by git itself (no auto-`--force`).
 
 ### Phase 4 — Desktop polish & packaging
 16. **Window chrome.** ✅ DONE: `data-tauri-drag-region` + minimize/maximize/close wired via `@tauri-apps/api/window`; `core:window:allow-*` capabilities added; dead `sidecar_url` command removed; exit now kills the process tree (`taskkill /T /F`).

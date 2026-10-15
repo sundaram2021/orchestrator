@@ -2,6 +2,7 @@ import type {
   AppConfig,
   DomainEvent,
   FileNode,
+  GitBranches,
   GitStatus,
   MessageView,
   ModelRef,
@@ -54,6 +55,11 @@ class Session {
   git = $state<GitStatus | null>(null);
   diff = $state("");
   commitMessage = $state("");
+  branches = $state<GitBranches | null>(null);
+  diffStaged = $state(false);
+  diffPath = $state<string | null>(null);
+  prTitle = $state("");
+  prBody = $state("");
   toast = $state<string | null>(null);
 
   private lastSeq = -1;
@@ -390,20 +396,63 @@ class Session {
     } catch {
       this.git = null;
     }
+    await this.refreshBranches();
   }
 
-  async loadDiff(path?: string): Promise<void> {
+  async refreshBranches(): Promise<void> {
     try {
-      const result = await this.client.request("gitDiff", path ? { path } : {});
+      this.branches = await this.client.request("gitBranches");
+    } catch {
+      this.branches = null;
+    }
+  }
+
+  async loadDiff(path?: string, staged = this.diffStaged): Promise<void> {
+    this.diffPath = path ?? null;
+    try {
+      const params: { path?: string; staged?: boolean } = {};
+      if (path) params.path = path;
+      if (staged) params.staged = true;
+      const result = await this.client.request("gitDiff", params);
       this.diff = result.diff;
     } catch (err) {
       this.notify(err instanceof Error ? err.message : String(err));
     }
   }
 
+  async setDiffStaged(staged: boolean): Promise<void> {
+    this.diffStaged = staged;
+    await this.loadDiff(this.diffPath ?? undefined, staged);
+  }
+
+  async openDiff(path: string): Promise<void> {
+    this.activeFile = path;
+    this.editorView = "diff";
+    await this.loadDiff(path);
+  }
+
   async stageAll(): Promise<void> {
     await this.client.request("gitStage", {});
     await this.refreshGit();
+  }
+
+  async stageFile(path: string): Promise<void> {
+    await this.client.request("gitStage", { path });
+    await this.refreshGit();
+  }
+
+  async checkout(branch: string): Promise<void> {
+    if (branch === this.git?.branch) return;
+    const result = await this.client.request("gitCheckout", { branch });
+    this.notify(result.ok ? `Switched to ${branch}` : result.output || "Checkout failed");
+    if (result.ok) await this.refreshGit();
+  }
+
+  async createPr(): Promise<void> {
+    const title = this.prTitle.trim() || `Orchestrator: ${this.git?.branch ?? "changes"}`;
+    const body = this.prBody.trim();
+    const result = await this.client.request("gitCreatePr", body ? { title, body } : { title });
+    this.notify(result.ok ? result.output || "Pull request created" : result.output || "PR failed");
   }
 
   async push(): Promise<void> {

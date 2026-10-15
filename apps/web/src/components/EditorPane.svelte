@@ -60,6 +60,16 @@
     <button class="tbtn" class:active={view === "diff"} title="Show git diff" onclick={() => toggle("diff")}>
       Git diff
     </button>
+    {#if view === "diff"}
+      <button
+        class="tbtn"
+        class:active={session.diffStaged}
+        title="Toggle staged vs unstaged diff"
+        onclick={() => void session.setDiffStaged(!session.diffStaged)}
+      >
+        {session.diffStaged ? "Staged" : "Unstaged"}
+      </button>
+    {/if}
     <button
       class="tbtn"
       class:active={view === "markdown"}
