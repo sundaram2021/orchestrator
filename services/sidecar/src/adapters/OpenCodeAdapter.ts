@@ -1,0 +1,398 @@
+import type { ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import type { HarnessStatus, ModelDescriptor } from "@orchestrator/contracts";
+import { runCapture, spawnStream } from "../util/process.js";
+import { uid } from "../util/ids.js";
+import { logger } from "../util/logger.js";
+import { parseOpenCodeModels } from "../models/catalog.js";
+import { openCodeBridgeConfig } from "../config/paths.js";
+import { OpenCodeServer, type ServerEvent, type ServerModel } from "./OpenCodeServer.js";
+import type { HarnessAdapter, ProviderEvent, SessionHandle } from "./HarnessAdapter.js";
+
+const log = logger("adapter:opencode");
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const harnessEnv = (): NodeJS.ProcessEnv =>
+  existsSync(openCodeBridgeConfig)
+    ? { ...process.env, OPENCODE_CONFIG: openCodeBridgeConfig }
+    : process.env;
+
+const parseModelRef = (model: string): { model: string; variant?: string } => {
+  const hash = model.indexOf("#");
+  if (hash === -1) return { model };
+  return { model: model.slice(0, hash), variant: model.slice(hash + 1) };
+};
+
+const toServerModel = (model: string): ServerModel => {
+  const { model: base, variant } = parseModelRef(model);
+  const slash = base.indexOf("/");
+  const providerID = slash === -1 ? "opencode" : base.slice(0, slash);
+  const modelID = slash === -1 ? base : base.slice(slash + 1);
+  return { providerID, modelID, ...(variant ? { variant } : {}) };
+};
+
+interface PartShape {
+  id?: string;
+  type?: string;
+  text?: string;
+  tool?: string;
+  callID?: string;
+  time?: { end?: number };
+  state?: { status?: string; input?: unknown; output?: string };
+}
+
+interface MessageInfoShape {
+  role?: string;
+  error?: { message?: string };
+}
+
+export function parseRunLine(line: string): ProviderEvent[] {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("{")) return [];
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    return [];
+  }
+  const type = obj.type;
+  const part = (obj.part ?? {}) as Record<string, unknown>;
+
+  if (type === "error") {
+    const err = (obj.error ?? part.error) as Record<string, unknown> | undefined;
+    const message = typeof err?.message === "string" ? err.message : "opencode error";
+    return [{ kind: "error", message }];
+  }
+
+  if (type === "text" && typeof part.text === "string") {
+    return [{ kind: "assistant", text: part.text, delta: true }];
+  }
+
+  if (type === "tool") {
+    const tool = typeof part.tool === "string" ? part.tool : "tool";
+    const callId = typeof part.callID === "string" ? part.callID : uid("call");
+    const state = (part.state ?? {}) as Record<string, unknown>;
+    const out: ProviderEvent[] = [];
+    const input = state.input ? JSON.stringify(state.input) : "{}";
+    out.push({ kind: "tool", callId, tool, args: input });
+    if (state.status === "completed" || typeof state.output === "string") {
+      out.push({
+        kind: "toolResult",
+        callId,
+        ok: state.status !== "error",
+        result: String(state.output ?? "").slice(0, 4000),
+      });
+    }
+    return out;
+  }
+
+  return [];
+}
+
+export class OpenCodeAdapter implements HarnessAdapter {
+  readonly id = "opencode";
+  readonly name = "OpenCode";
+  readonly color = "#5b8def";
+  readonly canExecute = true;
+
+  private state: HarnessStatus = "disabled";
+  private available = false;
+  private readonly children = new Map<string, ChildProcess>();
+  private readonly externalIds = new Map<string, string>();
+  private server: OpenCodeServer | null = null;
+  private liveServer = true;
+
+  get status(): HarnessStatus {
+    return this.state;
+  }
+
+  async detect(): Promise<boolean> {
+    const res = await runCapture("opencode", ["--version"], { timeoutMs: 15000 });
+    this.available = !res.failed && /\d+\.\d+/.test(res.stdout || res.stderr);
+    return this.available;
+  }
+
+  async start(): Promise<void> {
+    this.state = "connecting";
+    const ok = await this.detect();
+    this.state = ok ? "connected" : "error";
+    log.info(`opencode ${ok ? "connected" : "unavailable"}`);
+  }
+
+  async stop(): Promise<void> {
+    for (const child of this.children.values()) child.kill();
+    this.children.clear();
+    await this.server?.dispose();
+    this.server = null;
+    this.state = "disabled";
+  }
+
+  async models(): Promise<ModelDescriptor[]> {
+    const res = await runCapture("opencode", ["models"], { timeoutMs: 30000 });
+    if (res.failed) return [];
+    return parseOpenCodeModels(res.stdout).map((m) => ({ id: m.id, name: m.short }));
+  }
+
+  getExternalId(sessionId: string): string | undefined {
+    return this.externalIds.get(sessionId);
+  }
+
+  async startSession(cwd: string): Promise<SessionHandle> {
+    return { id: uid("ses_"), cwd };
+  }
+
+  async interrupt(session: SessionHandle): Promise<void> {
+    const child = this.children.get(session.id);
+    if (child) {
+      child.kill();
+      this.children.delete(session.id);
+    }
+    if (session.externalId) await this.server?.abort(session.externalId);
+  }
+
+  private ensureServer(): OpenCodeServer {
+    if (!this.server) this.server = new OpenCodeServer(harnessEnv());
+    return this.server;
+  }
+
+  private simulate(model: string): AsyncIterable<ProviderEvent> {
+    const steps: Array<{ wait: number; event: ProviderEvent }> = [
+      { wait: 400, event: { kind: "system", text: `OpenCode unavailable — running in simulation · ${model}` } },
+      {
+        wait: 900,
+        event: { kind: "assistant", text: "Reading the request and planning the steps.", delta: true },
+      },
+      { wait: 700, event: { kind: "tool", callId: uid("call"), tool: "read", args: '{"path":"src/main.ts"}' } },
+      { wait: 500, event: { kind: "assistant", text: "\n\nApplying the change.", delta: true } },
+      { wait: 700, event: { kind: "done" } },
+    ];
+    return (async function* () {
+      for (const step of steps) {
+        await sleep(step.wait);
+        yield step.event;
+      }
+    })();
+  }
+
+  private runTurn(session: SessionHandle, prompt: string, model: string): AsyncIterable<ProviderEvent> {
+    const children = this.children;
+    const externalIds = this.externalIds;
+    const modelRef = parseModelRef(model);
+
+    async function* run(): AsyncGenerator<ProviderEvent> {
+      const args = ["run", prompt, "--format", "json", "-m", modelRef.model];
+      if (modelRef.variant) args.push("--variant", modelRef.variant);
+      const child = spawnStream("opencode", args, { cwd: session.cwd, env: harnessEnv() });
+      children.set(session.id, child);
+
+      let buffer = "";
+      const errored = { value: false };
+      const lines: string[] = [];
+      let notify: (() => void) | null = null;
+
+      child.stdout.on("data", (d: Buffer) => {
+        buffer += d.toString();
+        let idx: number;
+        while ((idx = buffer.indexOf("\n")) !== -1) {
+          lines.push(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 1);
+        }
+        notify?.();
+      });
+      child.stderr.on("data", (d: Buffer) => log.debug(d.toString().trim()));
+      child.on("error", (err) => {
+        errored.value = true;
+        lines.push(JSON.stringify({ type: "error", error: { message: String(err) } }));
+        notify?.();
+      });
+
+      const closed = new Promise<number>((resolve) => {
+        child.on("close", (code) => {
+          if (buffer.trim()) lines.push(buffer);
+          resolve(code ?? 0);
+          notify?.();
+        });
+      });
+
+      while (true) {
+        if (lines.length === 0) {
+          const closedNow = await Promise.race([
+            closed.then(() => "closed" as const),
+            new Promise<"tick">((r) => {
+              notify = () => r("tick");
+            }),
+          ]);
+          notify = null;
+          if (closedNow === "closed" && lines.length === 0) break;
+          continue;
+        }
+        const line = lines.shift()!;
+        for (const evt of parseRunLine(line)) {
+          if (evt.kind === "assistant" || evt.kind === "system" || evt.kind === "tool") {
+            const m = /"sessionID":"([^"]+)"/.exec(line);
+            if (m) externalIds.set(session.id, m[1]!);
+          }
+          if (evt.kind === "error") errored.value = true;
+          yield evt;
+        }
+      }
+
+      const code = await closed;
+      children.delete(session.id);
+      if (code !== 0 && !errored.value) {
+        yield { kind: "error", message: `opencode exited with code ${code}` };
+        return;
+      }
+      if (code === 0) yield { kind: "done" };
+    }
+
+    return run();
+  }
+
+  private serveTurn(
+    session: SessionHandle,
+    prompt: string,
+    model: string,
+  ): AsyncIterable<ProviderEvent> {
+    const self = this;
+    const modelRef = toServerModel(model);
+
+    async function* serve(): AsyncGenerator<ProviderEvent> {
+      const server = self.ensureServer();
+      let serverID = session.externalId;
+      if (!serverID) {
+        serverID = await server.createSession(modelRef, session.cwd);
+        session.externalId = serverID;
+        self.externalIds.set(session.id, serverID);
+      }
+
+      const queue: ServerEvent[] = [];
+      let notify: (() => void) | null = null;
+      let finished = false;
+      const streamedParts = new Set<string>();
+      const toolState = new Map<string, "called" | "done">();
+
+      const unsub = server.subscribe((event) => {
+        const sid = event.properties?.sessionID;
+        if (typeof sid === "string" && sid !== serverID) return;
+        queue.push(event);
+        notify?.();
+      });
+
+      const post = server.sendMessage(serverID, modelRef, prompt).catch((err: unknown) => {
+        queue.push({ type: "__error", properties: { message: err instanceof Error ? err.message : String(err) } });
+        notify?.();
+      });
+
+      try {
+        while (true) {
+          if (queue.length === 0) {
+            if (finished) break;
+            await new Promise<void>((resolve) => {
+              notify = () => resolve();
+            });
+            notify = null;
+            continue;
+          }
+          const event = queue.shift()!;
+          const props = event.properties ?? {};
+
+          switch (event.type) {
+            case "__error":
+              yield { kind: "error", message: String(props.message ?? "opencode error") };
+              return;
+            case "message.part.delta": {
+              const delta = props.delta;
+              const partID = props.partID;
+              if (props.field === "text" && typeof delta === "string" && delta) {
+                if (typeof partID === "string") streamedParts.add(partID);
+                yield { kind: "assistant", text: delta, delta: true };
+              }
+              break;
+            }
+            case "message.part.updated": {
+              const part = props.part as PartShape | undefined;
+              if (!part) break;
+              if (
+                part.type === "text" &&
+                typeof part.text === "string" &&
+                part.id &&
+                part.time?.end &&
+                !streamedParts.has(part.id)
+              ) {
+                streamedParts.add(part.id);
+                if (part.text) yield { kind: "assistant", text: part.text, delta: true };
+              } else if (part.type === "tool" && part.callID) {
+                const callId = part.callID;
+                const state = part.state ?? {};
+                if (!toolState.has(callId)) {
+                  toolState.set(callId, "called");
+                  yield {
+                    kind: "tool",
+                    callId,
+                    tool: part.tool ?? "tool",
+                    args: JSON.stringify(state.input ?? {}),
+                  };
+                }
+                if ((state.status === "completed" || state.status === "error") && toolState.get(callId) !== "done") {
+                  toolState.set(callId, "done");
+                  yield {
+                    kind: "toolResult",
+                    callId,
+                    ok: state.status !== "error",
+                    result: String(state.output ?? "").slice(0, 4000),
+                  };
+                }
+              }
+              break;
+            }
+            case "message.updated": {
+              const info = props.info as MessageInfoShape | undefined;
+              if (info?.role === "assistant" && info.error) {
+                yield { kind: "error", message: info.error.message ?? "opencode error" };
+              }
+              break;
+            }
+            case "session.idle":
+              finished = true;
+              break;
+            case "session.error": {
+              const err = props.error as { message?: string } | undefined;
+              yield { kind: "error", message: err?.message ?? "opencode session error" };
+              finished = true;
+              break;
+            }
+            default:
+              break;
+          }
+        }
+        await post;
+        yield { kind: "done" };
+      } finally {
+        unsub();
+      }
+    }
+
+    return serve();
+  }
+
+  sendTurn(session: SessionHandle, prompt: string, model: string): AsyncIterable<ProviderEvent> {
+    if (!this.available) return this.simulate(model);
+    if (!this.liveServer) return this.runTurn(session, prompt, model);
+
+    const self = this;
+    async function* guarded(): AsyncGenerator<ProviderEvent> {
+      try {
+        await self.ensureServer().url(session.cwd);
+      } catch (err) {
+        self.liveServer = false;
+        log.warn("opencode serve unavailable, falling back to run mode", err instanceof Error ? err.message : err);
+        yield* self.runTurn(session, prompt, model);
+        return;
+      }
+      yield* self.serveTurn(session, prompt, model);
+    }
+    return guarded();
+  }
+}

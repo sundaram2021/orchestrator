@@ -1,0 +1,9 @@
+packages:
+  - "packages/*"
+  - "services/*"
+  - "apps/*"
+
+allowBuilds:
+  esbuild: true
+
+verifyDepsBeforeRun: false
