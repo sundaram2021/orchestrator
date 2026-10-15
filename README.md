@@ -55,12 +55,12 @@ A Tauri 2 desktop app with:
 
 **Chat / dock**
 - Enter send, Shift+Enter newline; hint `@file · /skill · /mcp`.
-- Streaming markdown; tool-call cards; code apply button (diff view then accept/reject).
+- Streaming markdown; tool-call cards; per-thread git checkpoints + diff review (T3-style).
 - Auto-route or manual harness per message.
 
 **Git**
 - Branch, status count, staged/unstaged.
-- One button commit/push/PR (later phase).
+- Per-file status/stage; branch switch; one button commit → push → PR (per agent branch).
 
 **Settings modal**
 - Harnesses, MCP Servers, Skills sections.
@@ -177,5 +177,17 @@ CSS uses token variables; only dark theme; system fonts.
 - No reimplementing agent tooling; reuse harness + MCP tools.
 - No billing/token resale.
 
+## 13. Implementation status (verified on this machine)
+
+- Gates: `pnpm typecheck` (0 errors/0 warnings), `pnpm build`, `pnpm test` (24 passing), `cargo build` — all green.
+- Desktop release: `pnpm tauri build` produces `orchestrator-desktop.exe` (~5.3 MB) plus MSI (~4.05 MiB) and NSIS (~3.59 MiB) installers; `removeUnusedCommands` trims unused core commands at build.
+- Budgets: binary <25 MB ✅; web main chunk ≈31 KB gz ✅ (Monaco lazy); sidecar heap idle not yet formally profiled.
+- Per-thread isolation: each agent runs in `~/.orchestrator/worktrees/<threadId>` on branch `orch/<short>`, with checkpoints and a T3-style "Commit & PR" landing action.
+- Settings persist to `~/.orchestrator/config.json`; events journal to `~/.orchestrator/events/<hash>.jsonl`.
+
+### Remaining (not blocking v1)
+- Sidecar idle-heap profiler + cold-start numbers; SQLite persistence (currently in-memory + JSONL journal); auto-update channel.
+
 ---
+
 Approved demo UI: `orchestrator-demo.html`. Production scaffold begins on your **"go"**.

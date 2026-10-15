@@ -114,3 +114,20 @@ apps/desktop         Tauri 2 shell (Rust) — requires `rustup`/cargo
 ## MCP test-tool (verified)
 - `mcpCallTool` RPC → `McpManager.callTool`; SettingsModal exposes a per-server "Test" panel
   (tool name via datalist + JSON args) for connected servers.
+
+## Checkpoints & landing (verified)
+- Per-thread checkpoints are git commits in the thread worktree: `WorktreeService.checkpoint/log/restore`
+  (RPC `createCheckpoint`/`listCheckpoints`/`restoreCheckpoint`). Restore = `reset --hard` + `clean -fd`.
+- Landing follows T3 Code: the primary per-thread action is **"Commit & PR"** (`landThread` = commit →
+  `git push -u origin <branch>` → `gh pr create`, graceful when `gh`/remote absent). `MergeThread`
+  (local `git merge` into the workspace) remains a secondary action.
+- `gitStatus` returns a per-file list; `gitBranches`/`gitCheckout`/`gitCreatePr` power the git panel
+  (branch `<select>`, per-file stage, staged/unstaged diff toggle, PR title/body).
+
+## Desktop (verified)
+- `pnpm tauri build` succeeds: `orchestrator-desktop.exe` ~5.3 MB + MSI/NSIS installers; cfg is
+  `build.removeUnusedCommands: true` and `app.security.csp` (not null). `tauri-plugin-dialog` +
+  `restart_sidecar(workspace)` command back the TitleBar "Open folder" picker; `RpcClient.setUrl`
+  reconnects and `session.onOpen` re-bootstraps when `lastSeq < 0`.
+- Window is frameless; controls + `data-tauri-drag-region` in `TitleBar.svelte`; exit kills the
+  process tree (`taskkill /T /F`).

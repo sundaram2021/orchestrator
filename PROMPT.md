@@ -38,9 +38,9 @@ and *dozens of agents run in parallel without stepping on each other*.
 | Editor | Monaco lazy, tabs, syntax, save, markdown preview | `apps/web/src/components/EditorPane.svelte`, `lib/monaco.ts`, `MarkdownPreview.svelte` |
 | Git | status, diff (read-only), branch, stage-all, commit, push | `git/GitService.ts`, `components/DiffView.svelte` |
 | UI shell | TitleBar, FileTree, AgentArea/AgentColumn, ChatDock, HistorySidebar (search+grouping), SettingsModal, StatusBar, ModelSelector (2-level+search) | `apps/web/src/components/*` |
-| Tests | 20 passing | `services/sidecar/src/**/*.test.ts` |
+| Tests | 24 passing | `services/sidecar/src/**/*.test.ts` |
 
-Quality gates currently green: `pnpm typecheck`, `pnpm build`, `pnpm test` (20/20), `cargo build`.
+Quality gates currently green: `pnpm typecheck`, `pnpm build`, `pnpm test` (24/24), `cargo build`, `pnpm tauri build`.
 
 **Note:** `neatroots` was intentionally removed from `~/.config/opencode/opencode.json` (and from
 the test fixture). Do not re-add it.
@@ -132,13 +132,13 @@ the test fixture). Do not re-add it.
 16. **Window chrome.** ✅ DONE: `data-tauri-drag-region` + minimize/maximize/close wired via `@tauri-apps/api/window`; `core:window:allow-*` capabilities added; dead `sidecar_url` command removed; exit now kills the process tree (`taskkill /T /F`).
 17. **CSP + `removeUnusedCommands`.** ✅ `build.removeUnusedCommands: true`; `app.security.csp` set (allows self + Tauri `ipc:`/`http://ipc.localhost`, local ws/http, Monaco blob workers; dev-safe `'unsafe-eval'`).
 18. **Open folder as workspace.** ✅ `tauri-plugin-dialog` + `restart_sidecar(workspace)` command (kills tree, respawns sidecar, returns new WS URL); web "Open folder" button (TitleBar) → dialog → `RpcClient.setUrl` reconnect + re-bootstrap.
-19. **Run the full desktop path once:** `pnpm tauri` → window loads bundled UI → sidecar spawns → send a prompt → see a streamed answer. Kill all child process groups on exit (Windows: job object).
-20. **Packaging:** `pnpm tauri build`; validate icons; decide on updater (optional for v1).
+19. **Run the full desktop path once:** ✅ `pnpm tauri build` succeeds (release binary ~5.3 MB). Interactive `pnpm tauri` run (window loads bundled UI → prompt → streamed answer) still needs a human at the GUI.
+20. **Packaging:** ✅ `pnpm tauri build` produces MSI (~4.05 MiB) + NSIS (~3.59 MiB); icons validated. Updater deferred (YAGNI for v1).
 
-### Phase 5 — Performance, tests, docs
-21. Verify budgets (README §6): binary <25 MB, web <250 KB gz (excl. lazy Monaco), sidecar heap <80 MB idle, cold start.
-22. Add tests for every new behavior (settings persistence, worktree lifecycle, replay, skill injection, PR parsing). Extend the existing `node --test` suite.
-23. Update `README.md` checkmarks and `AGENTS.md` with any new verified facts. Keep `AGENTS.md` short and factual.
+### Phase 5 — Performance, tests, docs — ✅ 22–23 DONE; 21 partial
+21. Budgets (README §6): binary <25 MB ✅ (~5.3 MB release exe), web <250 KB gz ✅ (~31 KB main, Monaco lazy). Sidecar heap/cold-start still to be profiled. ⬜ PARTIAL.
+22. ✅ Tests added: settings persistence (`SettingsStore`), worktree fields on `thread.started`, git status/branches/checkout, checkpoint/restore — **24 passing**.
+23. ✅ README §13 implementation status + AGENTS.md "Checkpoints & landing" / "Desktop" sections.
 
 ---
 
