@@ -1,0 +1,74 @@
+apps/web/src/components/SettingsModal.svelte
+  s_0dc3da93d59c81::t_79b1267d1c44ce 8
+  s_0dc3da93d59c81::t_7c69c80c40603b 122
+  s_0dc3da93d59c81::t_bb5743ecaa66be 139-170
+services/sidecar/src/adapters/OpenCodeServerPool.test.ts
+  s_0dc3da93d59c81::t_654d34db555d56 1-111
+README.md
+  s_0dc3da93d59c81::t_83ba75fbad638d 182
+  s_0dc3da93d59c81::t_a31c1da8916465 187
+  s_0dc3da93d59c81::t_12c52d8794329b 185
+services/sidecar/src/adapters/OpenCodeAdapter.ts
+  s_0dc3da93d59c81::t_800e359ec9f0e6 4,10
+  s_0dc3da93d59c81::t_730de8fdf537dc 406,410
+  s_0dc3da93d59c81::t_2b1c48d3c69693 273,280,282-288,290-300
+  s_0dc3da93d59c81::t_d78f27586add5b 156,159-160
+  s_0dc3da93d59c81::t_15ed9372707448 104,107-113,132,134-135
+  s_0dc3da93d59c81::t_20892877efd295 386-387
+services/sidecar/src/mcp/McpClient.ts
+  s_0dc3da93d59c81::t_9816e3f06b51dd 4
+  s_0dc3da93d59c81::t_6e088601e1374d 232
+packages/contracts/src/rpc.ts
+  s_0dc3da93d59c81::t_89b876b3343d2c 33-37
+AGENTS.md
+  s_0dc3da93d59c81::t_21b5622913bde6 134
+  s_0dc3da93d59c81::t_520894164b5959 93-97,101-110
+  s_0dc3da93d59c81::t_764609e0602d8f 111
+services/sidecar/src/util/process.ts
+  s_0dc3da93d59c81::t_46ca803a877731 2-3
+  s_0dc3da93d59c81::t_438ca8ca3e1e1b 57-74
+  s_0dc3da93d59c81::t_050df18dcb9bc7 42
+packages/contracts/src/config.ts
+  s_0dc3da93d59c81::t_e2f56817342305 61-66,73
+services/sidecar/src/adapters/OpenCodeServer.ts
+  s_0dc3da93d59c81::t_7814046cf3820d 4
+  s_0dc3da93d59c81::t_aea1bf034ab7d0 55
+  s_0dc3da93d59c81::t_046897f1473e82 175
+services/sidecar/src/event/ReadModel.test.ts
+  s_0dc3da93d59c81::t_aca12a42f53e53 12
+services/sidecar/src/config/SettingsStore.ts
+  s_0dc3da93d59c81::t_6efaae366ea14a 32,36,42-45,97-114
+  s_0dc3da93d59c81::t_c2cb74d279c0e9 12
+services/sidecar/src/Orchestrator.ts
+  s_0dc3da93d59c81::t_79d3e52b827f87 193-199
+services/sidecar/src/index.ts
+  s_0dc3da93d59c81::t_5d6efc20aa3576 34
+PROMPT.md
+  s_0dc3da93d59c81::t_2f905ca8e5ebfe 125-126
+apps/web/src/lib/session.svelte.ts
+  s_0dc3da93d59c81::t_9dd460dcfaa969 282-289
+services/sidecar/src/config/SettingsStore.test.ts
+  s_0dc3da93d59c81::t_732831115e1d9a 14-15
+  s_0dc3da93d59c81::t_d91dcb64fe8c94 34-47
+services/sidecar/src/adapters/OpenCodeServerPool.ts
+  s_0dc3da93d59c81::t_2d9cf8136a069e 1-90,99-124
+  s_0dc3da93d59c81::t_61b8ad5a4beeb6 91-98
+services/sidecar/src/config/ConfigService.ts
+  s_0dc3da93d59c81::t_a76268f3a3b2b2 122-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "283b4e149ae21616fe105140c9c636945c517a13",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
