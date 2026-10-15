@@ -1,6 +1,7 @@
 import spawn from "cross-spawn";
 import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
+import { killTree } from "../util/process.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("opencode:server");
@@ -51,7 +52,7 @@ export class OpenCodeServer {
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
-        child.kill();
+        killTree(child);
         reject(new Error("opencode serve did not start in time"));
       }, 20_000);
 
@@ -171,6 +172,6 @@ export class OpenCodeServer {
     const child = this.child;
     this.child = null;
     this.base = null;
-    if (child) child.kill();
+    if (child) killTree(child);
   }
 }

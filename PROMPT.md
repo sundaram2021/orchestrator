@@ -122,8 +122,8 @@ the test fixture). Do not re-add it.
 ### Phase 2 status: ✅ COMPLETE (8–11)
 
 ### Phase 3 — Git & review flow — ✅ 12–15 DONE
-12. **Checkpoints (reworked from per-hunk accept/reject).** Per-thread git checkpoints in the worktree: `WorktreeService.checkpoint/log/restore` + `listCheckpoints`/`createCheckpoint`/`restoreCheckpoint` RPC + UI list with Restore. T3 Code uses checkpoints + diff review rather than per-hunk accept/reject.
-    - **Landing default follows T3:** the primary per-thread action is **"Commit & PR"** (`landThread` = commit → `push -u origin <branch>` → `gh pr create` with generated title); `Merge` stays as a secondary local-merge action.
+12. **Checkpoints (reworked from per-hunk accept/reject).** Per-thread git checkpoints in the worktree: `WorktreeService.checkpoint/log/restore` + `listCheckpoints`/`createCheckpoint`/`restoreCheckpoint` RPC + UI list with Restore. Per-hunk accept/reject was superseded by checkpoints + diff review.
+    - **Landing default:** the primary per-thread action is **"Commit & PR"** (`landThread` = commit → `push -u origin <branch>` → `gh pr create` with generated title); `Merge` stays as a secondary local-merge action.
 13. **One-click PR.** ✅ `GitService.createPullRequest` (shells `gh pr create`, graceful "gh not found" error) + `gitCreatePr` RPC + "Open PR" UI (title/body).
 14. **Staged diff + per-file stage.** ✅ `gitStatus` now returns a per-file `files` list; changed-file list in `FileTree` with per-file stage; staged/unstaged toggle in the editor diff bar.
 15. **Branch switch.** ✅ `gitBranches` + `gitCheckout` RPC + branch `<select>` in `FileTree`; dirty trees are refused by git itself (no auto-`--force`).

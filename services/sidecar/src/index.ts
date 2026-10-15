@@ -31,6 +31,7 @@ async function main(): Promise<void> {
     harnesses: [],
     mcp: [],
     skills: [],
+    updates: { autoUpdate: true, includeMajor: true },
     version: "0.1.0",
   });
 

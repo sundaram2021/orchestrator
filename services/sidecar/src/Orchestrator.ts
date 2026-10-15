@@ -190,6 +190,13 @@ export class Orchestrator {
       case "SetEnabled":
         await this.setEnabled(command.target, command.id, command.enabled);
         break;
+      case "SetUpdateSettings":
+        this.deps.config.setUpdateSettings({
+          ...(command.autoUpdate !== undefined ? { autoUpdate: command.autoUpdate } : {}),
+          ...(command.includeMajor !== undefined ? { includeMajor: command.includeMajor } : {}),
+        });
+        await this.publishConfig();
+        break;
     }
     return { accepted: true };
   }

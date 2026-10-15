@@ -1,6 +1,7 @@
 import spawn from "cross-spawn";
 import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
+import { killTree } from "../util/process.js";
 
 const PROTOCOL_VERSION = "2024-11-05";
 const REQUEST_TIMEOUT_MS = 20000;
@@ -228,7 +229,7 @@ class StdioConnection implements McpConnection {
   close(): void {
     this.failAll(new Error("mcp stdio connection closed"));
     this.child.stdin.end();
-    this.child.kill();
+    killTree(this.child);
   }
 }
 

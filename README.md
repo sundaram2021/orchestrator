@@ -55,7 +55,7 @@ A Tauri 2 desktop app with:
 
 **Chat / dock**
 - Enter send, Shift+Enter newline; hint `@file · /skill · /mcp`.
-- Streaming markdown; tool-call cards; per-thread git checkpoints + diff review (T3-style).
+- Streaming markdown; tool-call cards; per-thread git checkpoints + diff review.
 - Auto-route or manual harness per message.
 
 **Git**
@@ -179,11 +179,12 @@ CSS uses token variables; only dark theme; system fonts.
 
 ## 13. Implementation status (verified on this machine)
 
-- Gates: `pnpm typecheck` (0 errors/0 warnings), `pnpm build`, `pnpm test` (24 passing), `cargo build` — all green.
+- Gates: `pnpm typecheck` (0 errors/0 warnings), `pnpm build`, `pnpm test` (32 passing), `cargo build` — all green.
 - Desktop release: `pnpm tauri build` produces `orchestrator-desktop.exe` (~5.3 MB) plus MSI (~4.05 MiB) and NSIS (~3.59 MiB) installers; `removeUnusedCommands` trims unused core commands at build.
 - Budgets: binary <25 MB ✅; web main chunk ≈31 KB gz ✅ (Monaco lazy); sidecar heap idle not yet formally profiled.
-- Per-thread isolation: each agent runs in `~/.orchestrator/worktrees/<threadId>` on branch `orch/<short>`, with checkpoints and a T3-style "Commit & PR" landing action.
+- Per-thread isolation: each agent runs in `~/.orchestrator/worktrees/<threadId>` on branch `orch/<short>`, with checkpoints and a "Commit & PR" landing action.
 - Settings persist to `~/.orchestrator/config.json`; events journal to `~/.orchestrator/events/<hash>.jsonl`.
+- Updates: Settings → Updates holds an `autoUpdate` toggle (on by default) plus `includeMajor` (on by default). The value persists in settings and is exposed on `AppConfig.updates`; the live Tauri updater wiring/signing is deferred until a signed release endpoint exists.
 
 ### Remaining (not blocking v1)
 - Sidecar idle-heap profiler + cold-start numbers; SQLite persistence (currently in-memory + JSONL journal); auto-update channel.

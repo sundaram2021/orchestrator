@@ -1,12 +1,13 @@
 import type { ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import type { HarnessStatus, ModelDescriptor } from "@orchestrator/contracts";
-import { runCapture, spawnStream } from "../util/process.js";
+import { killTree, runCapture, spawnStream } from "../util/process.js";
 import { uid } from "../util/ids.js";
 import { logger } from "../util/logger.js";
 import { parseOpenCodeModels } from "../models/catalog.js";
 import { openCodeBridgeConfig } from "../config/paths.js";
 import { OpenCodeServer, type ServerEvent, type ServerModel } from "./OpenCodeServer.js";
+import { OpenCodeServerPool } from "./OpenCodeServerPool.js";
 import type { HarnessAdapter, ProviderEvent, SessionHandle, TurnOptions } from "./HarnessAdapter.js";
 
 const log = logger("adapter:opencode");
@@ -100,8 +101,15 @@ export class OpenCodeAdapter implements HarnessAdapter {
   private available = false;
   private readonly children = new Map<string, ChildProcess>();
   private readonly externalIds = new Map<string, string>();
-  private server: OpenCodeServer | null = null;
+  private poolInstance: OpenCodeServerPool | null = null;
   private liveServer = true;
+
+  private get pool(): OpenCodeServerPool {
+    if (!this.poolInstance) {
+      this.poolInstance = new OpenCodeServerPool((env) => new OpenCodeServer(env), harnessEnv());
+    }
+    return this.poolInstance;
+  }
 
   get status(): HarnessStatus {
     return this.state;
@@ -121,10 +129,10 @@ export class OpenCodeAdapter implements HarnessAdapter {
   }
 
   async stop(): Promise<void> {
-    for (const child of this.children.values()) child.kill();
+    for (const child of this.children.values()) killTree(child);
     this.children.clear();
-    await this.server?.dispose();
-    this.server = null;
+    await this.poolInstance?.disposeAll();
+    this.poolInstance = null;
     this.state = "disabled";
   }
 
@@ -145,15 +153,11 @@ export class OpenCodeAdapter implements HarnessAdapter {
   async interrupt(session: SessionHandle): Promise<void> {
     const child = this.children.get(session.id);
     if (child) {
-      child.kill();
+      killTree(child);
       this.children.delete(session.id);
     }
-    if (session.externalId) await this.server?.abort(session.externalId);
-  }
-
-  private ensureServer(): OpenCodeServer {
-    if (!this.server) this.server = new OpenCodeServer(harnessEnv());
-    return this.server;
+    const server = this.poolInstance?.peek(session.cwd);
+    if (session.externalId && server) await server.abort(session.externalId);
   }
 
   private simulate(model: string): AsyncIterable<ProviderEvent> {
@@ -266,33 +270,35 @@ export class OpenCodeAdapter implements HarnessAdapter {
     const modelRef = toServerModel(model);
 
     async function* serve(): AsyncGenerator<ProviderEvent> {
-      const server = self.ensureServer();
-      let serverID = session.externalId;
-      if (!serverID) {
-        serverID = await server.createSession(modelRef, session.cwd);
-        session.externalId = serverID;
-        self.externalIds.set(session.id, serverID);
-      }
+      const server = await self.pool.acquire(session.cwd);
 
       const queue: ServerEvent[] = [];
       let notify: (() => void) | null = null;
       let finished = false;
       const streamedParts = new Set<string>();
       const toolState = new Map<string, "called" | "done">();
-
-      const unsub = server.subscribe((event) => {
-        const sid = event.properties?.sessionID;
-        if (typeof sid === "string" && sid !== serverID) return;
-        queue.push(event);
-        notify?.();
-      });
-
-      const post = server.sendMessage(serverID, modelRef, prompt, system).catch((err: unknown) => {
-        queue.push({ type: "__error", properties: { message: err instanceof Error ? err.message : String(err) } });
-        notify?.();
-      });
+      let unsub: (() => void) | null = null;
 
       try {
+        let serverID = session.externalId;
+        if (!serverID) {
+          serverID = await server.createSession(modelRef, session.cwd);
+          session.externalId = serverID;
+          self.externalIds.set(session.id, serverID);
+        }
+
+        unsub = server.subscribe((event) => {
+          const sid = event.properties?.sessionID;
+          if (typeof sid === "string" && sid !== serverID) return;
+          queue.push(event);
+          notify?.();
+        });
+
+        const post = server.sendMessage(serverID, modelRef, prompt, system).catch((err: unknown) => {
+          queue.push({ type: "__error", properties: { message: err instanceof Error ? err.message : String(err) } });
+          notify?.();
+        });
+
         while (true) {
           if (queue.length === 0) {
             if (finished) break;
@@ -377,7 +383,8 @@ export class OpenCodeAdapter implements HarnessAdapter {
         await post;
         yield { kind: "done" };
       } finally {
-        unsub();
+        unsub?.();
+        self.pool.release(session.cwd);
       }
     }
 
@@ -396,10 +403,11 @@ export class OpenCodeAdapter implements HarnessAdapter {
     const self = this;
     async function* guarded(): AsyncGenerator<ProviderEvent> {
       try {
-        await self.ensureServer().url(session.cwd);
+        await self.pool.probe(session.cwd);
       } catch (err) {
         self.liveServer = false;
         log.warn("opencode serve unavailable, falling back to run mode", err instanceof Error ? err.message : err);
+        await self.pool.drop(session.cwd).catch(() => undefined);
         yield* self.runTurn(session, prompt, model, options?.system);
         return;
       }

@@ -1,5 +1,6 @@
 import spawn from "cross-spawn";
-import type { ChildProcessByStdio } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import type { ChildProcess, ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 
 type StreamedChild = ChildProcessByStdio<null, Readable, Readable>;
@@ -38,7 +39,7 @@ export function runCapture(
 
     if (options.timeoutMs) {
       timer = setTimeout(() => {
-        child.kill();
+        killTree(child);
         finish(-1, true);
       }, options.timeoutMs);
     }
@@ -51,6 +52,24 @@ export function runCapture(
     child.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
     child.on("close", (code) => finish(code ?? -1, code !== 0));
   });
+}
+
+export function killTree(child: ChildProcess): void {
+  const pid = child.pid;
+  if (!pid || child.killed) return;
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      /* already gone */
+    }
+  }
 }
 
 export function spawnStream(

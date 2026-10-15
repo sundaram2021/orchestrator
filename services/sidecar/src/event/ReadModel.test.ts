@@ -9,6 +9,7 @@ const config: AppConfig = {
   harnesses: [],
   mcp: [],
   skills: [],
+  updates: { autoUpdate: true, includeMajor: true },
   version: "0.1.0",
 };
 

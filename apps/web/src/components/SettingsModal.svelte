@@ -5,6 +5,7 @@
     { id: "harnesses", label: "Harnesses" },
     { id: "mcp", label: "MCP Servers" },
     { id: "skills", label: "Skills" },
+    { id: "updates", label: "Updates" },
   ];
 
   const onToggle = (target: "harness" | "mcp" | "skill", id: string, enabled: boolean) => {
@@ -118,7 +119,7 @@
               </div>
             {/if}
           {/each}
-        {:else}
+        {:else if session.settingsSection === "skills"}
           <h3>Skills</h3>
           <div class="sub">
             {(session.config?.skills ?? []).filter((s) => s.enabled).length} of {(session.config?.skills ?? []).length} enabled.
@@ -135,6 +136,38 @@
               </label>
             </div>
           {/each}
+        {:else}
+          <h3>Updates</h3>
+          <div class="sub">The desktop app can install new versions automatically on launch.</div>
+          <div class="srow">
+            <div class="grow">
+              <div class="name">Install updates automatically</div>
+              <div class="detail">Check for a newer release at startup and install it.</div>
+            </div>
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={session.config?.updates.autoUpdate ?? true}
+                onchange={(e) => void session.setUpdateSettings({ autoUpdate: e.currentTarget.checked })}
+              />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="srow">
+            <div class="grow">
+              <div class="name">Include major versions</div>
+              <div class="detail">Also install releases with a major version bump.</div>
+            </div>
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={session.config?.updates.includeMajor ?? true}
+                disabled={!(session.config?.updates.autoUpdate ?? true)}
+                onchange={(e) => void session.setUpdateSettings({ includeMajor: e.currentTarget.checked })}
+              />
+              <span class="slider"></span>
+            </label>
+          </div>
         {/if}
       </div>
     </div>

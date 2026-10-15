@@ -30,6 +30,11 @@ export const CommandSchema = z.discriminatedUnion("kind", [
     id: z.string(),
     enabled: z.boolean(),
   }),
+  z.object({
+    kind: z.literal("SetUpdateSettings"),
+    autoUpdate: z.boolean().optional(),
+    includeMajor: z.boolean().optional(),
+  }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 

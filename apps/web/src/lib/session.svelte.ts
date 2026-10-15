@@ -18,7 +18,7 @@ export interface DockMessage {
 }
 
 export type EditorView = "code" | "diff" | "markdown";
-export type SettingsSection = "harnesses" | "mcp" | "skills";
+export type SettingsSection = "harnesses" | "mcp" | "skills" | "updates";
 
 const uid = (): string =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -277,6 +277,14 @@ class Session {
 
   async toggle(target: "harness" | "mcp" | "skill", id: string, enabled: boolean): Promise<void> {
     await this.client.request("dispatchCommand", { kind: "SetEnabled", target, id, enabled });
+  }
+
+  async setUpdateSettings(patch: { autoUpdate?: boolean; includeMajor?: boolean }): Promise<void> {
+    if (this.config) {
+      if (patch.autoUpdate !== undefined) this.config.updates.autoUpdate = patch.autoUpdate;
+      if (patch.includeMajor !== undefined) this.config.updates.includeMajor = patch.includeMajor;
+    }
+    await this.client.request("dispatchCommand", { kind: "SetUpdateSettings", ...patch });
   }
 
   setMode(mode: "ide" | "agent"): void {

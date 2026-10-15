@@ -90,11 +90,24 @@ apps/desktop         Tauri 2 shell (Rust) — requires `rustup`/cargo
   `store.load()` and replays into the `ReadModel` before boot; old `running` threads are marked
   `stopped` on startup. Journals are per-workspace and can contain config snapshots (no secrets).
 - **User settings** persist to `~/.orchestrator/config.json` via `config/SettingsStore.ts`
-  (`model`, and per-id `harnesses`/`mcp`/`skills` boolean overrides). Re-applied after
-  `config.assemble()` so toggles survive restart. `SettingsStore` with no file path is in-memory
-  (used by unit tests).
+  (`model`, per-id `harnesses`/`mcp`/`skills` boolean overrides, and `updates.autoUpdate` /
+  `updates.includeMajor` — both default **on**). Re-applied after `config.assemble()` so toggles
+  survive restart. `SettingsStore` with no file path is in-memory (used by unit tests). The
+  `SetUpdateSettings` command updates them; they surface on `AppConfig.updates`. The live Tauri
+  updater wiring/signing is intentionally deferred until a signed release endpoint exists.
 - On WS reopen the client calls `replayEvents(lastSeq + 1)` (`session.svelte.ts onOpen`) to
   recover events missed while disconnected.
+
+## Process lifecycle (verified)
+- `util/process.ts` `killTree(child)` reaps a whole process tree: `taskkill /PID <pid> /T /F` on
+  Windows, else `process.kill(-pid, "SIGKILL")`. Used by `OpenCodeServer` (dispose + 20 s start
+  timeout), `McpClient` stdio `close()`, `runCapture` timeout, and `OpenCodeAdapter` run-mode /
+  interrupt. `index.ts` shutdown calls `adapters.stopAll()` + `mcp.stopAll()`.
+- `OpenCodeAdapter` no longer holds one `serve` for the whole sidecar. `OpenCodeServerPool`
+  (`adapters/OpenCodeServerPool.ts`) keeps **one `opencode serve` per cwd** (worktree), reference
+  counted per turn (`acquire`/`release`), and **reaps idle servers** after 5 min with none active.
+  So parallel agents each get a serve rooted in their own worktree, and processes don't linger.
+  `stop()` → `pool.disposeAll()`. Unit-tested with an injected factory (`OpenCodeServerPool.test.ts`).
 
 ## Multi-agent isolation (verified)
 - Each `StartThread` gets its own git worktree at `~/.orchestrator/worktrees/<threadId>` on
@@ -118,7 +131,7 @@ apps/desktop         Tauri 2 shell (Rust) — requires `rustup`/cargo
 ## Checkpoints & landing (verified)
 - Per-thread checkpoints are git commits in the thread worktree: `WorktreeService.checkpoint/log/restore`
   (RPC `createCheckpoint`/`listCheckpoints`/`restoreCheckpoint`). Restore = `reset --hard` + `clean -fd`.
-- Landing follows T3 Code: the primary per-thread action is **"Commit & PR"** (`landThread` = commit →
+- Landing is commit-and-PR by default: the primary per-thread action is **"Commit & PR"** (`landThread` = commit →
   `git push -u origin <branch>` → `gh pr create`, graceful when `gh`/remote absent). `MergeThread`
   (local `git merge` into the workspace) remains a secondary action.
 - `gitStatus` returns a per-file list; `gitBranches`/`gitCheckout`/`gitCreatePr` power the git panel

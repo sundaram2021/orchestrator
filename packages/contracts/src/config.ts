@@ -58,12 +58,19 @@ export const SkillConfigSchema = z.object({
 });
 export type SkillConfig = z.infer<typeof SkillConfigSchema>;
 
+export const UpdateSettingsSchema = z.object({
+  autoUpdate: z.boolean(),
+  includeMajor: z.boolean(),
+});
+export type UpdateSettings = z.infer<typeof UpdateSettingsSchema>;
+
 export const AppConfigSchema = z.object({
   workspace: z.string(),
   model: ModelRefSchema,
   harnesses: z.array(HarnessConfigSchema),
   mcp: z.array(McpServerConfigSchema),
   skills: z.array(SkillConfigSchema),
+  updates: UpdateSettingsSchema,
   version: z.string(),
 });
 export type AppConfig = z.infer<typeof AppConfigSchema>;

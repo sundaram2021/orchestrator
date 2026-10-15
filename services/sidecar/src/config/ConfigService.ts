@@ -101,6 +101,7 @@ export class ConfigService {
       harnesses,
       mcp: this.mcp.list(),
       skills: this.skills.list(),
+      updates: { autoUpdate: this.settings.autoUpdate, includeMajor: this.settings.includeMajor },
       version: "0.1.0",
     };
     this.config = config;
@@ -117,5 +118,16 @@ export class ConfigService {
     this.settings.setHarness(id, enabled);
     const harness = this.config?.harnesses.find((h) => h.id === id);
     if (harness) harness.enabled = enabled;
+  }
+
+  setUpdateSettings(settings: { autoUpdate?: boolean; includeMajor?: boolean }): void {
+    if (settings.autoUpdate !== undefined) {
+      this.settings.setAutoUpdate(settings.autoUpdate);
+      if (this.config) this.config.updates.autoUpdate = settings.autoUpdate;
+    }
+    if (settings.includeMajor !== undefined) {
+      this.settings.setIncludeMajor(settings.includeMajor);
+      if (this.config) this.config.updates.includeMajor = settings.includeMajor;
+    }
   }
 }
