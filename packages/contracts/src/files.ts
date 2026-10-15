@@ -50,3 +50,10 @@ export const GitResultSchema = z.object({
   output: z.string(),
 });
 export type GitResult = z.infer<typeof GitResultSchema>;
+
+export const CheckpointSchema = z.object({
+  sha: z.string(),
+  label: z.string(),
+  ts: z.number().int(),
+});
+export type Checkpoint = z.infer<typeof CheckpointSchema>;

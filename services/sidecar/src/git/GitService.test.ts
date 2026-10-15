@@ -35,6 +35,7 @@ const makeRepo = (): string => {
   run(dir, ["-c", "init.defaultBranch=main", "init"]);
   run(dir, ["config", "user.email", "test@example.com"]);
   run(dir, ["config", "user.name", "Test"]);
+  run(dir, ["config", "core.autocrlf", "false"]);
   writeFileSync(path.join(dir, "a.txt"), "one\n");
   run(dir, ["add", "a.txt"]);
   run(dir, ["commit", "-m", "init"]);

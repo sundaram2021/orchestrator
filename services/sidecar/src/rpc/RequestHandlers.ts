@@ -83,6 +83,21 @@ export class RequestHandlers {
           body: typeof p.body === "string" ? p.body : undefined,
           base: typeof p.base === "string" ? p.base : undefined,
         });
+      case "listCheckpoints":
+        return this.deps.orchestrator.listCheckpoints(str(p.threadId));
+      case "createCheckpoint":
+        return this.deps.orchestrator.createCheckpoint(
+          str(p.threadId),
+          typeof p.label === "string" ? p.label : undefined,
+        );
+      case "restoreCheckpoint":
+        return this.deps.orchestrator.restoreCheckpoint(str(p.threadId), str(p.sha));
+      case "landThread":
+        return this.deps.orchestrator.landThread(str(p.threadId), {
+          title: typeof p.title === "string" ? p.title : undefined,
+          body: typeof p.body === "string" ? p.body : undefined,
+          base: typeof p.base === "string" ? p.base : undefined,
+        });
       case "launchAntigravity": {
         const adapter = this.deps.adapters.get("antigravity");
         if (!adapter || !isLaunchable(adapter)) {

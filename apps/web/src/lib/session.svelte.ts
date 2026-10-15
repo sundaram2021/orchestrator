@@ -1,5 +1,6 @@
 import type {
   AppConfig,
+  Checkpoint,
   DomainEvent,
   FileNode,
   GitBranches,
@@ -60,6 +61,7 @@ class Session {
   diffPath = $state<string | null>(null);
   prTitle = $state("");
   prBody = $state("");
+  checkpoints = $state<Record<string, Checkpoint[]>>({});
   toast = $state<string | null>(null);
 
   private lastSeq = -1;
@@ -453,6 +455,36 @@ class Session {
     const body = this.prBody.trim();
     const result = await this.client.request("gitCreatePr", body ? { title, body } : { title });
     this.notify(result.ok ? result.output || "Pull request created" : result.output || "PR failed");
+  }
+
+  async loadCheckpoints(threadId: string): Promise<void> {
+    try {
+      this.checkpoints[threadId] = await this.client.request("listCheckpoints", { threadId });
+    } catch {
+      this.checkpoints[threadId] = [];
+    }
+  }
+
+  async createCheckpoint(threadId: string): Promise<void> {
+    const result = await this.client.request("createCheckpoint", { threadId });
+    this.notify(result.ok ? `Checkpoint ${result.sha}` : result.output || "Checkpoint failed");
+    await this.loadCheckpoints(threadId);
+  }
+
+  async restoreCheckpoint(threadId: string, sha: string): Promise<void> {
+    if (!confirm(`Restore this agent's worktree to ${sha}? Later changes will be discarded.`)) return;
+    const result = await this.client.request("restoreCheckpoint", { threadId, sha });
+    this.notify(result.ok ? `Restored to ${sha}` : result.output || "Restore failed");
+    await this.loadCheckpoints(threadId);
+  }
+
+  async landThread(threadId: string, title?: string): Promise<void> {
+    const result = await this.client.request(
+      "landThread",
+      title && title.trim() ? { threadId, title: title.trim() } : { threadId },
+    );
+    this.notify(result.ok ? result.output || "Pull request opened" : result.output || "Landing failed");
+    await this.loadCheckpoints(threadId);
   }
 
   async push(): Promise<void> {

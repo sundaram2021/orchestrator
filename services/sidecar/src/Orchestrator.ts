@@ -1,5 +1,6 @@
 import type {
   AppConfig,
+  Checkpoint,
   Command,
   DomainEvent,
   EventBody,
@@ -87,6 +88,76 @@ export class Orchestrator {
 
   replay(fromSeq: number): DomainEvent[] {
     return this.deps.store.since(fromSeq);
+  }
+
+  async listCheckpoints(threadId: string): Promise<Checkpoint[]> {
+    const thread = this.findThread(threadId);
+    if (!thread?.worktree) return [];
+    return this.deps.worktrees.log(thread.worktree);
+  }
+
+  async createCheckpoint(
+    threadId: string,
+    label?: string,
+  ): Promise<{ ok: boolean; sha: string; output: string }> {
+    const thread = this.findThread(threadId);
+    if (!thread?.worktree) return { ok: false, sha: "", output: "This thread has no isolated worktree." };
+    const message = label?.trim() || `checkpoint ${new Date().toISOString()}`;
+    const res = await this.deps.worktrees.checkpoint(thread.worktree, message);
+    this.emit({
+      type: "message.appended",
+      threadId,
+      messageId: uid("m"),
+      role: "system",
+      text: res.ok ? `Checkpoint ${res.sha}: ${message}` : `Checkpoint failed: ${res.output}`,
+    });
+    return res;
+  }
+
+  async restoreCheckpoint(threadId: string, sha: string): Promise<{ ok: boolean; output: string }> {
+    const thread = this.findThread(threadId);
+    if (!thread?.worktree) return { ok: false, output: "This thread has no isolated worktree." };
+    const res = await this.deps.worktrees.restore(thread.worktree, sha);
+    this.emit({
+      type: "message.appended",
+      threadId,
+      messageId: uid("m"),
+      role: "system",
+      text: res.ok ? `Restored worktree to ${sha}.` : `Restore failed: ${res.output}`,
+    });
+    return res;
+  }
+
+  async landThread(
+    threadId: string,
+    options: { title?: string; body?: string; base?: string } = {},
+  ): Promise<{ ok: boolean; output: string }> {
+    const thread = this.findThread(threadId);
+    if (!thread?.branch || !thread.worktree) {
+      return { ok: false, output: "This thread has no isolated branch to land." };
+    }
+    const title = options.title?.trim() || thread.title;
+    const commit = await this.deps.worktrees.checkpoint(thread.worktree, title);
+    if (!commit.ok) {
+      this.system(threadId, `Commit failed: ${commit.output}`);
+      return { ok: false, output: commit.output };
+    }
+    const push = await this.deps.worktrees.push(thread.worktree, thread.branch);
+    if (!push.ok) {
+      this.system(threadId, `Push failed: ${push.output}`);
+      return { ok: false, output: push.output };
+    }
+    const pr = await this.deps.worktrees.createPullRequest(thread.worktree, {
+      title,
+      body: options.body,
+      base: options.base,
+    });
+    this.system(threadId, pr.ok ? `Pull request: ${pr.output}` : `Pushed, but no PR: ${pr.output}`);
+    return pr;
+  }
+
+  private system(threadId: string, text: string): void {
+    this.emit({ type: "message.appended", threadId, messageId: uid("m"), role: "system", text });
   }
 
   async handle(command: Command): Promise<{ accepted: true }> {

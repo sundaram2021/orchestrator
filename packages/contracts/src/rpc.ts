@@ -2,7 +2,13 @@ import { z } from "zod";
 import { AppConfigSchema, ModelRefSchema } from "./config.js";
 import { DomainEventSchema } from "./events.js";
 import { ReadModelSchema } from "./readmodel.js";
-import { FileContentSchema, FileNodeSchema, GitBranchesSchema, GitStatusSchema } from "./files.js";
+import {
+  CheckpointSchema,
+  FileContentSchema,
+  FileNodeSchema,
+  GitBranchesSchema,
+  GitStatusSchema,
+} from "./files.js";
 
 export const CommandSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -47,6 +53,10 @@ export const METHOD_NAMES = [
   "gitBranches",
   "gitCheckout",
   "gitCreatePr",
+  "listCheckpoints",
+  "createCheckpoint",
+  "restoreCheckpoint",
+  "landThread",
   "launchAntigravity",
   "mcpCallTool",
 ] as const;
@@ -93,6 +103,16 @@ export interface MethodMap {
   gitCheckout: { params: { branch: string; force?: boolean }; result: { ok: boolean; output: string } };
   gitCreatePr: {
     params: { title: string; body?: string; base?: string };
+    result: { ok: boolean; output: string };
+  };
+  listCheckpoints: { params: { threadId: string }; result: z.infer<typeof CheckpointSchema>[] };
+  createCheckpoint: {
+    params: { threadId: string; label?: string };
+    result: { ok: boolean; sha: string; output: string };
+  };
+  restoreCheckpoint: { params: { threadId: string; sha: string }; result: { ok: boolean; output: string } };
+  landThread: {
+    params: { threadId: string; title?: string; body?: string; base?: string };
     result: { ok: boolean; output: string };
   };
   launchAntigravity: { params: undefined; result: { ok: boolean; detail: string } };
