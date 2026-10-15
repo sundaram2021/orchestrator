@@ -130,8 +130,8 @@ the test fixture). Do not re-add it.
 
 ### Phase 4 — Desktop polish & packaging
 16. **Window chrome.** ✅ DONE: `data-tauri-drag-region` + minimize/maximize/close wired via `@tauri-apps/api/window`; `core:window:allow-*` capabilities added; dead `sidecar_url` command removed; exit now kills the process tree (`taskkill /T /F`).
-17. **CSP + `removeUnusedCommands`.** `tauri.conf.json` has `"csp": null`; set a strict CSP and enable command trimming.
-18. **Open folder as workspace.** Workspace is fixed at launch (`ORCHESTRATOR_WORKSPACE`). Add a folder picker (Tauri dialog) that restarts/points the sidecar at the chosen workspace.
+17. **CSP + `removeUnusedCommands`.** ✅ `build.removeUnusedCommands: true`; `app.security.csp` set (allows self + Tauri `ipc:`/`http://ipc.localhost`, local ws/http, Monaco blob workers; dev-safe `'unsafe-eval'`).
+18. **Open folder as workspace.** ✅ `tauri-plugin-dialog` + `restart_sidecar(workspace)` command (kills tree, respawns sidecar, returns new WS URL); web "Open folder" button (TitleBar) → dialog → `RpcClient.setUrl` reconnect + re-bootstrap.
 19. **Run the full desktop path once:** `pnpm tauri` → window loads bundled UI → sidecar spawns → send a prompt → see a streamed answer. Kill all child process groups on exit (Windows: job object).
 20. **Packaging:** `pnpm tauri build`; validate icons; decide on updater (optional for v1).
 

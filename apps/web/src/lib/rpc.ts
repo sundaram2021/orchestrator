@@ -27,7 +27,19 @@ export class RpcClient {
 
   state: ConnState = "connecting";
 
-  constructor(private readonly url: string) {}
+  constructor(private url: string) {}
+
+  setUrl(url: string): void {
+    if (url === this.url) return;
+    this.url = url;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.attempt = 0;
+    this.ws?.close();
+    this.connect();
+  }
 
   onEvent(listener: (event: DomainEvent) => void): () => void {
     this.eventListeners.add(listener);

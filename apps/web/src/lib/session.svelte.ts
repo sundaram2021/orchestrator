@@ -80,13 +80,15 @@ class Session {
   }
 
   private async onOpen(): Promise<void> {
-    if (this.lastSeq >= 0) {
-      try {
-        const missed = await this.client.request("replayEvents", { fromSeq: this.lastSeq + 1 });
-        for (const event of missed) this.applyEvent(event);
-      } catch {
-        /* next reconnect retries */
-      }
+    if (this.lastSeq < 0) {
+      await this.bootstrap();
+      return;
+    }
+    try {
+      const missed = await this.client.request("replayEvents", { fromSeq: this.lastSeq + 1 });
+      for (const event of missed) this.applyEvent(event);
+    } catch {
+      /* next reconnect retries */
     }
     this.client.resume();
   }
@@ -505,6 +507,29 @@ class Session {
   async launchAntigravity(): Promise<void> {
     const result = await this.client.request("launchAntigravity");
     this.notify(result.ok ? "Launching Antigravity IDE" : `Antigravity: ${result.detail}`);
+  }
+
+  async openWorkspace(): Promise<void> {
+    if (!(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window)) {
+      this.notify("Open folder is only available in the desktop app.");
+      return;
+    }
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({ directory: true, multiple: false });
+      if (typeof selected !== "string") return;
+      const { invoke } = await import("@tauri-apps/api/core");
+      const url = await invoke<string>("restart_sidecar", { workspace: selected });
+      this.threads = [];
+      this.activeThreadId = null;
+      this.git = null;
+      this.checkpoints = {};
+      this.lastSeq = -1;
+      this.client.setUrl(url);
+      this.notify(`Workspace: ${selected}`);
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
   }
 }
 

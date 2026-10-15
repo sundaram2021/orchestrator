@@ -7,12 +7,13 @@
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "pnpm --filter @orchestrator/web dev",
-    "beforeBuildCommand": "pnpm --filter @orchestrator/web build"
+    "beforeBuildCommand": "pnpm --filter @orchestrator/web build",
+    "removeUnusedCommands": true
   },
   "app": {
     "windows": [],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:* ws://localhost:* http://127.0.0.1:* http://localhost:*; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval' blob:; worker-src 'self' blob:"
     }
   },
   "bundle": {

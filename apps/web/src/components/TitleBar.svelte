@@ -32,6 +32,7 @@
   </div>
   <strong style="margin-left:6px" data-tauri-drag-region>orchestrator</strong>
   <span style="color:var(--muted)" data-tauri-drag-region>— {session.config?.workspace ?? "no workspace"}</span>
+  <button class="pill" title="Open a folder as workspace" onclick={() => void session.openWorkspace()}>Open folder</button>
   <div class="spacer" data-tauri-drag-region></div>
   {#if model}
     <span class="pill" title="Active model">

@@ -11,6 +11,7 @@ const FALLBACK_WS: &str = "ws://127.0.0.1:4123";
 
 struct Sidecar {
     child: Mutex<Option<Child>>,
+    ws_url: Arc<Mutex<Option<String>>>,
 }
 
 fn free_port() -> u16 {
@@ -74,6 +75,34 @@ fn kill_tree(child: &mut Child) {
     }
 }
 
+#[tauri::command]
+async fn restart_sidecar(workspace: String, state: tauri::State<'_, Sidecar>) -> Result<String, String> {
+    if let Ok(mut guard) = state.child.lock() {
+        if let Some(mut child) = guard.take() {
+            kill_tree(&mut child);
+        }
+    }
+    if let Ok(mut url) = state.ws_url.lock() {
+        *url = None;
+    }
+
+    let port = free_port();
+    let child = spawn_sidecar(&workspace, port, state.ws_url.clone()).map_err(|e| e.to_string())?;
+    if let Ok(mut guard) = state.child.lock() {
+        *guard = Some(child);
+    }
+
+    for _ in 0..150 {
+        if let Ok(guard) = state.ws_url.lock() {
+            if let Some(found) = guard.as_ref() {
+                return Ok(found.clone());
+            }
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Ok(format!("ws://127.0.0.1:{port}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let workspace = std::env::var("ORCHESTRATOR_WORKSPACE")
@@ -85,9 +114,12 @@ pub fn run() {
     let setup_url = ws_url.clone();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(Sidecar {
             child: Mutex::new(child),
+            ws_url,
         })
+        .invoke_handler(tauri::generate_handler![restart_sidecar])
         .setup(move |app| {
             let mut url = format!("ws://127.0.0.1:{port}");
             for _ in 0..60 {
