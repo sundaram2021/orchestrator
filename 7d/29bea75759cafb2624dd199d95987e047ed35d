@@ -1,0 +1,27 @@
+PROMPT.md
+  s_0dc3da93d59c81::t_36627826a83c51 135-136
+  s_0dc3da93d59c81::t_8bf1f78a52db79 138-141
+  s_0dc3da93d59c81::t_a032e5329199f7 41,43
+README.md
+  s_0dc3da93d59c81::t_af48999043ae29 58
+  s_0dc3da93d59c81::t_5482c082991395 180-190,192
+  s_0dc3da93d59c81::t_6b446dfda5ab4f 63
+AGENTS.md
+  s_0dc3da93d59c81::t_db955eb70c229e 116-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7d29bea75759cafb2624dd199d95987e047ed35d",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
