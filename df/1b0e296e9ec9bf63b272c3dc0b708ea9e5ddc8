@@ -1,0 +1,315 @@
+apps/web/src/main.ts
+  s_87d283e395bcb1::t_a25717cff128d6 1-8
+apps/web/src/lib/monaco.ts
+  s_f4e2fa93e8ab33::t_707792897d45df 1-53
+services/sidecar/src/mcp/McpManager.ts
+  s_87d283e395bcb1::t_d892768621b4b8 1,5-9,17,30,32-34,36-37,40-41,62-64,70-71,80-81,85-86,88-90,104-106,109,111-113
+  s_f4e2fa93e8ab33::t_7c036a7e11c1c7 2-3,10-11,31,35,38-39,43,46-51,53,55-58,60-61,65-69,72-79,82-84,87,91-103,107-108,110
+  s_0dc3da93d59c81::t_0ffdc5404aa27d 4,12-16,18-29,42,44-45,52,54,59
+services/sidecar/src/event/EventStore.test.ts
+  s_0dc3da93d59c81::t_da1e110128f8bb 3-5
+  s_0dc3da93d59c81::t_508d8bb13f1210 26-40
+  s_f4e2fa93e8ab33::t_9ca49a30018721 1-2,6-25
+apps/web/src/components/HistorySidebar.svelte
+  s_87d283e395bcb1::t_2c040b8ba20cdf 1-53
+apps/web/src/components/ChatDock.svelte
+  s_87d283e395bcb1::t_097ffca21c8a43 1-48
+apps/web/src/components/FileNodeView.svelte
+  s_f4e2fa93e8ab33::t_730f0f14e8fc91 1-42
+packages/contracts/src/events.ts
+  s_87d283e395bcb1::t_5360a8bf7e356c 1-110
+apps/desktop/package.json
+  s_87d283e395bcb1::t_6f6ac5a592ff91 1-18
+apps/web/src/components/StatusBar.svelte
+  s_87d283e395bcb1::t_fc61ea3bb5750b 1-9,11-18,35-38,40
+  s_f4e2fa93e8ab33::t_4c9590f8ad5d56 10,19-34,39
+packages/contracts/src/files.ts
+  s_f4e2fa93e8ab33::t_77e5bb55050d6c 1-32
+services/sidecar/src/files/FilesService.ts
+  s_f4e2fa93e8ab33::t_acc6d58954d6eb 1-94
+services/sidecar/src/adapters/OpenCodeAdapter.ts
+  s_0dc3da93d59c81::t_90b156a34d5b12 2,8,15-19
+  s_0dc3da93d59c81::t_0a9450468c5cd7 9,27-49,103-104,126-127,151-156,159,178,231,251-396
+  s_87d283e395bcb1::t_af629d46f40cf4 161
+  s_0dc3da93d59c81::t_ecef1519fb39c5 186
+  s_87d283e395bcb1::t_cb8c1434eda3bc 1,3-7,10-14,20-26,50-102,105-125,128-150,157-158,160,162-177,179-185,187-230,232-250,397-398
+tsconfig.base.json
+  s_87d283e395bcb1::t_150a8bbb59f372 1-21
+services/sidecar/src/event/ReadModel.test.ts
+  s_f4e2fa93e8ab33::t_a24427edf6136d 1-43
+services/sidecar/src/Broadcaster.ts
+  s_87d283e395bcb1::t_fbd5dd3eb135c8 1-14
+apps/web/src/App.svelte
+  s_87d283e395bcb1::t_25f38131740518 1-38,43-44
+  s_f4e2fa93e8ab33::t_0f9161397180fa 39-42
+apps/desktop/src-tauri/build.rs
+  s_87d283e395bcb1::t_2412f22e6452ba 1-3
+services/sidecar/src/adapters/OpenCodeServer.ts
+  s_0dc3da93d59c81::t_a7e0559897b65f 1-183
+services/sidecar/src/util/ids.ts
+  s_87d283e395bcb1::t_d7ec5b66f3ddeb 1-8
+apps/web/src/components/ModelSelector.svelte
+  s_87d283e395bcb1::t_a0b49b12bce049 58
+  s_87d283e395bcb1::t_c0691b0d789c5a 1-57,59-109
+packages/contracts/package.json
+  s_87d283e395bcb1::t_4407df0e16d37e 1-26
+apps/web/src/components/TitleBar.svelte
+  s_87d283e395bcb1::t_0ca27528285023 1,3-10,14-24,32-43
+  s_f4e2fa93e8ab33::t_8f0c1d705206e9 2,11-13,25-31
+packages/contracts/src/readmodel.ts
+  s_87d283e395bcb1::t_bc9e590d490fbf 1-46
+apps/web/vite.config.ts
+  s_87d283e395bcb1::t_62b5aedd95a5a1 1-13,25-26
+  s_f4e2fa93e8ab33::t_c0e6a53a171a42 14-16,23-24
+  s_f4e2fa93e8ab33::t_00ed80bde867ef 17-22
+packages/contracts/src/index.ts
+  s_f4e2fa93e8ab33::t_a6ad8bba1facfb 3
+  s_87d283e395bcb1::t_36f8e4a2c8eb8c 1-2,4-7
+apps/web/tsconfig.json
+  s_87d283e395bcb1::t_eec549bea2ec51 1-16
+apps/web/src/lib/icons.ts
+  s_f4e2fa93e8ab33::t_88e94add3f8369 1-66
+packages/contracts/tsconfig.json
+  s_87d283e395bcb1::t_9116f76902ce82 1-10
+apps/desktop/src-tauri/Cargo.toml
+  s_87d283e395bcb1::t_946cb815cc5a7b 1-24
+apps/web/src/components/EditorPane.svelte
+  s_87d283e395bcb1::t_ffff181ddd5023 1-2,7,12,17-21,53-54,56,59,62,85-86
+  s_f4e2fa93e8ab33::t_816ec486403992 3-6,8-11,13-16,22-52,55,57-58,60-61,63-84
+apps/web/src/components/CodeEditor.svelte
+  s_f4e2fa93e8ab33::t_7c0ba051760d33 1-48
+services/sidecar/src/models/catalog.ts
+  s_87d283e395bcb1::t_52b2b31a2a2696 1-68
+services/sidecar/src/adapters/AdapterManager.ts
+  s_87d283e395bcb1::t_32cd61d694826a 1-52
+apps/desktop/src-tauri/tauri.conf.json
+  s_87d283e395bcb1::t_2e1faadd1fcc2d 1-12,14-23
+  s_f4e2fa93e8ab33::t_277cd397165964 13
+services/sidecar/src/adapters/AntigravityAdapter.ts
+  s_87d283e395bcb1::t_d25c5506132a28 1-3,7,13-57,72
+  s_f4e2fa93e8ab33::t_aa2ea81a798b6e 4-6,8-12
+  s_f4e2fa93e8ab33::t_19f1aa1a5e558b 58-71
+packages/contracts/src/config.ts
+  s_87d283e395bcb1::t_a4b7cdb7198116 1-69
+AGENTS.md
+  s_f4e2fa93e8ab33::t_cc1940144b1c2c 49-57
+  s_0dc3da93d59c81::t_9ce0165dd59069 58-71
+  s_87d283e395bcb1::t_e65a64cb33bae3 1-48
+  s_0dc3da93d59c81::t_b2b51f116b9242 72-91
+pnpm-workspace.yaml
+  s_87d283e395bcb1::t_79639c2aff0917 7,9
+  s_87d283e395bcb1::t_d3481c381f3874 6,8
+  s_87d283e395bcb1::t_d5eddbba9799d1 5
+  s_87d283e395bcb1::t_a508a65c23fadf 1-4
+services/sidecar/src/server.ts
+  s_87d283e395bcb1::t_22bc155ff42863 1-9,12-20,27-37,46-50,52-71,74-97
+  s_87d283e395bcb1::t_26b8da755513dc 10,21-22,24-26,45,51
+  s_87d283e395bcb1::t_57ef48f778204e 38-44
+  s_f4e2fa93e8ab33::t_1e282e07dc9c2b 11,23
+  s_f4e2fa93e8ab33::t_8ea24b6df7b629 72-73
+services/sidecar/src/git/GitService.ts
+  s_87d283e395bcb1::t_b2645f7e573c06 2-3,5-9,12-38,44,60-61
+  s_f4e2fa93e8ab33::t_b3534b285eed65 1,4,39-43,45-59
+  s_f4e2fa93e8ab33::t_0e9c737361c4e1 10-11
+apps/web/src/components/Message.svelte
+  s_87d283e395bcb1::t_23c72626a90327 1-22
+apps/desktop/src-tauri/icons/android/mipmap-anydpi-v26/ic_launcher.xml
+  s_f4e2fa93e8ab33::t_b2671deda087bd 1-5
+apps/web/src/components/DiffView.svelte
+  s_f4e2fa93e8ab33::t_0326fa699f8d69 1-34
+services/sidecar/src/models/catalog.test.ts
+  s_f4e2fa93e8ab33::t_6aaa20a552f367 1-45
+services/sidecar/src/mcp/McpClient.ts
+  s_87d283e395bcb1::t_d056af7eee2a33 5,7,10-11,13,15,24,46,48-50,58,60-65,84,87,91,220,233
+  s_f4e2fa93e8ab33::t_59d55da1288b46 14
+  s_f4e2fa93e8ab33::t_8e42686efc5758 1-4,6,8-9,12,16-23,25-45,47,51-57,59,66-83,85-86,88-90,92-219,221-232,234-247
+services/sidecar/src/skills/SkillsLoader.test.ts
+  s_f4e2fa93e8ab33::t_e40bca40c34791 1-27
+services/sidecar/src/mcp/OpenCodeMcpBridge.ts
+  s_0dc3da93d59c81::t_3e3a6021c86262 1-20,22-79
+  s_0dc3da93d59c81::t_750d02e61a9a14 21
+.gitignore
+  s_87d283e395bcb1::t_efb62978ab85c8 1-22
+services/sidecar/src/skills/SkillsLoader.ts
+  s_87d283e395bcb1::t_f1e8b7357e0790 1-88,104-112
+  s_f4e2fa93e8ab33::t_b4b6633a8db218 89-103
+services/sidecar/package.json
+  s_87d283e395bcb1::t_30c0f899024abc 16,21
+  s_87d283e395bcb1::t_1be13872100436 1-11,13-15,17-20,22-27
+  s_f4e2fa93e8ab33::t_fad6468a648a6c 12
+services/sidecar/src/index.ts
+  s_0dc3da93d59c81::t_6d473f222c7b0f 15,25,34-37
+  s_f4e2fa93e8ab33::t_b32c5525b005dd 10-12,48-53,56
+  s_0dc3da93d59c81::t_abe88cc1569f0e 66
+  s_87d283e395bcb1::t_e8e470fdc99fb0 1-9,13-14,16-24,26-33,38-47,54-55,57-65,67-78
+apps/desktop/src-tauri/capabilities/default.json
+  s_87d283e395bcb1::t_466a882df52f4b 1-7
+apps/web/src/lib/session.svelte.ts
+  s_f4e2fa93e8ab33::t_e6aa03624d78c9 331-336
+  s_f4e2fa93e8ab33::t_1429c5ee044dc3 4-5,48-58,81-82,199-205,250-330,337-348
+  s_87d283e395bcb1::t_c6e2c48a376deb 65
+  s_87d283e395bcb1::t_52b1cc9f3f4337 1-3,6-47,59-64,66-80,83-198,206-249,349-356
+services/sidecar/src/util/process.ts
+  s_f4e2fa93e8ab33::t_e84191d78c3bfe 68-93
+  s_87d283e395bcb1::t_937dd66347176a 1,4,7-23,26-59,61-64,67
+  s_87d283e395bcb1::t_4894c844c7de01 2-3,5-6,24-25,60,65-66
+apps/web/src/lib/rpc.ts
+  s_87d283e395bcb1::t_86f16120ec9fe8 113-116
+  s_87d283e395bcb1::t_3bf996975e5b8a 1-112,117-128
+apps/web/package.json
+  s_f4e2fa93e8ab33::t_2b68aaff616ab7 13-14
+  s_87d283e395bcb1::t_2962bb9304917b 1-12,15-24
+apps/web/src/components/AgentColumn.svelte
+  s_87d283e395bcb1::t_26f7add2d5eeb2 21,23-25,27,46
+  s_87d283e395bcb1::t_7d687e10339b97 1-19,22,26,28-45,47-55
+  s_87d283e395bcb1::t_91d7a378f563a2 20
+services/sidecar/tsconfig.json
+  s_87d283e395bcb1::t_2ee68c7cbd8193 1-12
+README.md
+  s_f3294a20730445::t_c80b5a779360e4 2,4,6,85,98,103-179
+  s_f3294a20730445::t_1455675b96441e 1
+  s_f3294a20730445::t_074e5022b440f3 3
+  s_f3294a20730445::t_1898077cb9894a 5
+  s_f3294a20730445::t_f995f918b3c5fc 7-9,82-84
+  s_f3294a20730445::t_59f05fac2f3195 86-88,95-97
+  s_f3294a20730445::t_1b88b467194ced 99-102
+  s_f3294a20730445::t_60a17e9e1670ed 180-181
+apps/web/src/app.css
+  s_87d283e395bcb1::t_bcff4671f9a780 1-1046
+  s_f4e2fa93e8ab33::t_b06c14246cb347 1047-1184
+apps/web/src/components/MarkdownPreview.svelte
+  s_f4e2fa93e8ab33::t_35ab9323525781 1-63
+apps/web/index.html
+  s_87d283e395bcb1::t_0911e5c58d3575 1-12
+apps/desktop/src-tauri/icons/android/values/ic_launcher_background.xml
+  s_f4e2fa93e8ab33::t_b2671deda087bd 1-4
+services/sidecar/src/rpc/RequestHandlers.ts
+  s_f4e2fa93e8ab33::t_b3631155f90398 72-73
+  s_f4e2fa93e8ab33::t_b18cb39293b29e 1-71,74-83
+apps/web/src/components/SettingsModal.svelte
+  s_87d283e395bcb1::t_2c923229eb588a 1-19,21-96
+  s_87d283e395bcb1::t_1a71477e649905 20
+services/sidecar/src/event/ReadModel.ts
+  s_87d283e395bcb1::t_45c00b9cbfa114 1-138
+services/sidecar/src/config/paths.ts
+  s_0dc3da93d59c81::t_dc01e70754129f 3,22-28
+  s_87d283e395bcb1::t_533cb1786f52b3 1-2,4-19
+  s_0dc3da93d59c81::t_abfc6d78eeb28c 20-21
+services/sidecar/src/event/EventStore.ts
+  s_87d283e395bcb1::t_404a431a54c55a 3-4,8-10,37-40,42,73-86
+  s_0dc3da93d59c81::t_e2f009b96f1829 1-2,5-7,11-36,41,43-72
+apps/web/svelte.config.js
+  s_87d283e395bcb1::t_cc27975d1b1bba 1-5
+services/sidecar/src/util/logger.ts
+  s_87d283e395bcb1::t_7f8bd7004bd79c 1-18
+services/sidecar/src/adapters/HarnessAdapter.ts
+  s_87d283e395bcb1::t_76c5e5430384ec 1-32
+  s_f4e2fa93e8ab33::t_a649eabba268f1 33-39
+package.json
+  s_87d283e395bcb1::t_aed0074c8e058c 1-15,17-25
+  s_87d283e395bcb1::t_b5178a5f655fd0 16
+PROMPT.md
+  s_0dc3da93d59c81::t_ab7382c3c61c47 1-188
+services/sidecar/src/adapters/OpenCodeAdapter.test.ts
+  s_f4e2fa93e8ab33::t_5eb32ae14a5183 1-40
+services/sidecar/src/mcp/OpenCodeMcpBridge.test.ts
+  s_0dc3da93d59c81::t_cdd09df8117b9c 27,29,31
+  s_0dc3da93d59c81::t_dbca1040f0ff3a 1-26,28,30,32-62
+apps/web/src/app.d.ts
+  s_87d283e395bcb1::t_ad9d183496ae40 1-9
+services/sidecar/src/mcp/mcpConfig.ts
+  s_87d283e395bcb1::t_0c421c90bef3fd 1-15,34-37,40-42,44-47,50-52,54-56,66-68,70,91-92,95-102,113-114,116,118,121,123-126
+  s_f4e2fa93e8ab33::t_76ac5346a65c81 16-33,38-39,43,48-49,53,57-65,69,71-90,93-94,103-112,115,117,119-120,122
+services/sidecar/src/config/ConfigService.ts
+  s_87d283e395bcb1::t_53e5b10d635880 25
+  s_87d283e395bcb1::t_a2d7d6a6602501 63
+  s_87d283e395bcb1::t_70c076940fac62 1-22,24,26-34,36-37,39-62,64-112,120
+  s_0dc3da93d59c81::t_821d59599b751c 23,35,38
+  s_87d283e395bcb1::t_4777cc56b3f9be 113-119
+services/sidecar/src/Orchestrator.ts
+  s_87d283e395bcb1::t_c28e73595ae68e 38
+  s_87d283e395bcb1::t_8799cb1c8daf9f 1-11,13-37,39-51,53-65,75-130,139-148,150-218
+  s_87d283e395bcb1::t_338aae049e46ac 12
+  s_0dc3da93d59c81::t_d3758531541d19 71-74
+  s_87d283e395bcb1::t_b5afced5930a16 52
+  s_f4e2fa93e8ab33::t_4065d69cfb9298 131-138
+  s_f4e2fa93e8ab33::t_3e1492263ea36d 149
+  s_0dc3da93d59c81::t_480eff0c87d762 66-70
+apps/desktop/src-tauri/src/main.rs
+  s_87d283e395bcb1::t_97057f653cb646 1-6
+apps/web/src/components/AgentArea.svelte
+  s_87d283e395bcb1::t_da469f7aac2804 1-26
+orchestrator-demo.html
+  s_f3294a20730445::t_bed95767884d7f 1-7,20-21,33-34,67-68,109,113,153-190,194-197,204-207,213-221,223,292-293,305,328,330-333,336-859
+  s_f3294a20730445::t_ce2e0d0b3ca2ba 8-10,17-19
+  s_f3294a20730445::t_575d6b1317e41a 22-24,30-32
+  s_f3294a20730445::t_dab60e11f072b9 35-37,64-66
+  s_f3294a20730445::t_3853ef407c574b 69-71,106-108
+  s_f3294a20730445::t_0cebd99c01c9e3 110-112
+  s_f3294a20730445::t_2d7b9f2cdfdea4 114-116,150-152
+  s_f3294a20730445::t_bb84f4abfd5bd6 191-193
+  s_f3294a20730445::t_f2c54749a8b9d4 198-203
+  s_f3294a20730445::t_efb1f22e34e5ca 208-212
+  s_f3294a20730445::t_3ee286a7b870d3 222
+  s_f3294a20730445::t_09245b0deab559 224-226,289-291
+  s_f3294a20730445::t_02f08486c2ee1c 294-296,302-304
+  s_f3294a20730445::t_5f6f7d6ea4be93 306-308,325-327
+  s_f3294a20730445::t_12d0f908d7587f 329
+  s_f3294a20730445::t_30e32e956c5457 334-335
+apps/desktop/src-tauri/src/lib.rs
+  s_87d283e395bcb1::t_6b5be779f4ac51 1,3,6,8,11,24-37,39,41-49,55-62,70-76,81-82,87,116-120,122-129
+  s_f4e2fa93e8ab33::t_2f626938f2e7f2 2,4-5,7,9-10,12-23,38,40,50-54,63-69,77-80,83-86,88-115,121
+apps/web/src/components/FileTree.svelte
+  s_f4e2fa93e8ab33::t_7069d0806ebc88 40
+  s_f4e2fa93e8ab33::t_f3e2c770f75212 3,5,9-13,15-33,35-39,41-43,45
+  s_87d283e395bcb1::t_a362cdb5964632 1-2,4,6-8,14,34,44,46-52
+packages/contracts/src/rpc.ts
+  s_f4e2fa93e8ab33::t_5db7dace27e6e8 5,26-41,43-45,48,73-82,84,87
+  s_87d283e395bcb1::t_ac67b12f8c00a3 1-4,6-25,46-47,49-72,85-86,88-89
+  s_f4e2fa93e8ab33::t_0f79d4d24c01e9 42
+  s_f4e2fa93e8ab33::t_f1f9ca91958c72 83
+apps/desktop/src-tauri/Cargo.lock
+  s_f4e2fa93e8ab33::t_84525b6e4fe285 1-4316
+pnpm-lock.yaml
+  s_f4e2fa93e8ab33::t_cbbfd845aed68e 1-1724
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df1b0e296e9ec9bf63b272c3dc0b708ea9e5ddc8",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    },
+    "s_87d283e395bcb1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf6599f7ffeHhjQEQMmFC3LLd",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    },
+    "s_f3294a20730445": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ec972d513ffetC7KN27JJfIH0G",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    },
+    "s_f4e2fa93e8ab33": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf3cbf91ffeDpHWGPtiT6bNQw",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
