@@ -118,7 +118,8 @@ the test fixture). Do not re-add it.
    - Acceptance: two agents editing the same file don't collide; each has an isolated checkout. (Needs ≥1 commit.)
 9. **Per-agent model/harness picker** (currently all threads use the global dock model). Add a picker on `AgentColumn` and pass harness/model in `StartThread`.
 10. **Retry and Fork.** ✅ `RetryThread`/`ForkThread` commands + `DiscardThread`/`MergeThread` + UI; dead `OpenCodeServer.fork()` removed (sibling re-run semantics instead).
-11. **Virtualize agent columns/history** for dozens of agents (windowing). ⬜ PENDING.
+11. **Virtualize agent columns/history** for dozens of agents (windowing). ✅ Fixed-width columns (340+12) are windowed in `AgentArea.svelte` (render visible ± 2 overscan, spacer divs preserve scroll extent).
+### Phase 2 status: ✅ COMPLETE (8–11)
 
 ### Phase 3 — Git & review flow — ✅ 13–15 DONE; 12 pending
 12. **Code-apply accept/reject.** When an agent turn produces file changes, surface a diff with per-hunk accept/reject that writes to the worktree. (Pairs with worktrees.) ⬜ PENDING.
