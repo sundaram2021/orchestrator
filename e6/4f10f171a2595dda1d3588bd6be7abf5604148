@@ -1,0 +1,57 @@
+packages/contracts/src/files.ts
+  s_0dc3da93d59c81::t_0f7768498ddf2b 53-59
+apps/web/src/components/AgentColumn.svelte
+  s_0dc3da93d59c81::t_e3b7f4b10a273d 86-93,98-108
+  s_0dc3da93d59c81::t_b9c78e6a967260 142-171
+  s_0dc3da93d59c81::t_11c59bffaf4dc6 25-30
+services/sidecar/src/git/GitService.test.ts
+  s_0dc3da93d59c81::t_ec0a408f468d5d 38
+services/sidecar/src/git/gh.ts
+  s_0dc3da93d59c81::t_c156f3763d7cab 1-20
+services/sidecar/src/git/GitService.ts
+  s_0dc3da93d59c81::t_e28f9f34e66c07 3
+  s_0dc3da93d59c81::t_b523955a009803 70
+apps/web/src/lib/session.svelte.ts
+  s_0dc3da93d59c81::t_84d14a95715609 64
+  s_0dc3da93d59c81::t_1b82fe318f2305 460-489
+  s_0dc3da93d59c81::t_3b9680bf9bfac8 3
+packages/contracts/src/rpc.ts
+  s_0dc3da93d59c81::t_10677f9ab0d86f 56-58
+  s_0dc3da93d59c81::t_6ee6f49ce0b3b8 59
+  s_0dc3da93d59c81::t_66921d4719009e 5-11
+  s_0dc3da93d59c81::t_aef858b69fbba2 108-113
+  s_0dc3da93d59c81::t_7d0f990f2311de 114-117
+PROMPT.md
+  s_0dc3da93d59c81::t_ce4bb65e77ec95 124-126
+services/sidecar/src/git/WorktreeService.ts
+  s_0dc3da93d59c81::t_b7d9b9a17983a6 3
+  s_0dc3da93d59c81::t_98dd43a8b5d1e2 83-94
+  s_0dc3da93d59c81::t_854a54d66cbd18 5
+  s_0dc3da93d59c81::t_e8b026e627b7fd 53-82
+services/sidecar/src/Orchestrator.ts
+  s_0dc3da93d59c81::t_d44f822917fc2e 93-130
+  s_0dc3da93d59c81::t_b0c3419c9b9ad4 131-162
+  s_0dc3da93d59c81::t_92e39ea9eac10d 3
+services/sidecar/src/rpc/RequestHandlers.ts
+  s_0dc3da93d59c81::t_b058b76f68dc88 86-94
+  s_0dc3da93d59c81::t_af1969d4bf0f8c 95-100
+services/sidecar/src/git/WorktreeService.test.ts
+  s_0dc3da93d59c81::t_1cf0fd6aa6590d 1-37,39-80
+  s_0dc3da93d59c81::t_b99fe580ba9e41 38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e64f10f171a2595dda1d3588bd6be7abf5604148",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
