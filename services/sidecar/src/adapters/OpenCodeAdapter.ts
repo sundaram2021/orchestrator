@@ -160,6 +160,10 @@ export class OpenCodeAdapter implements HarnessAdapter {
     if (session.externalId && server) await server.abort(session.externalId);
   }
 
+  async disposeWorkspace(dir: string): Promise<void> {
+    await this.poolInstance?.drop(dir);
+  }
+
   private simulate(model: string): AsyncIterable<ProviderEvent> {
     const steps: Array<{ wait: number; event: ProviderEvent }> = [
       { wait: 400, event: { kind: "system", text: `OpenCode unavailable — running in simulation · ${model}` } },

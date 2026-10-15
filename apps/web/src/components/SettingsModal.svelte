@@ -8,7 +8,7 @@
     { id: "updates", label: "Updates" },
   ];
 
-  const onToggle = (target: "harness" | "mcp" | "skill", id: string, enabled: boolean) => {
+  const onToggle = (target: "harness" | "mcp" | "skill", id: string, enabled: boolean): void => {
     void session.toggle(target, id, enabled);
   };
 
@@ -18,14 +18,14 @@
   let testResult = $state<string | null>(null);
   let testBusy = $state(false);
 
-  const toggleTest = (name: string) => {
+  const toggleTest = (name: string): void => {
     testFor = testFor === name ? null : name;
     testToolName = "";
     testArgs = "{}";
     testResult = null;
   };
 
-  const runTest = async (server: string) => {
+  const runTest = async (server: string): Promise<void> => {
     testBusy = true;
     testResult = null;
     try {
@@ -47,9 +47,9 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
     <div class="modal-head">
       <strong id="settingsTitle">Settings</strong>
-      <span class="sub">Harnesses, MCP servers and skills</span>
+      <span class="sub">Harnesses, MCP servers, skills and updates</span>
       <div class="spacer"></div>
-      <button class="btn ghost" onclick={() => session.closeSettings()}>Close</button>
+      <button class="tbtn" onclick={() => session.closeSettings()}>Close</button>
     </div>
     <div class="modal-body">
       <nav class="settings-nav">
@@ -94,7 +94,7 @@
                 <div class="detail">{s.transport} · {s.source} · {s.detail}{s.tools.length ? ` · ${s.tools.length} tools` : ""}</div>
               </div>
               {#if s.status === "connected"}
-                <button class="btn ghost" onclick={() => toggleTest(s.name)}>Test</button>
+                <button class="tbtn" onclick={() => toggleTest(s.name)}>Test</button>
               {/if}
               <label class="switch">
                 <input type="checkbox" checked={s.enabled} onchange={(e) => onToggle("mcp", s.name, e.currentTarget.checked)} />
@@ -110,8 +110,8 @@
                   </datalist>
                   <textarea class="test-args" bind:value={testArgs} placeholder={'{"key":"value"}'}></textarea>
                 </div>
-                <div class="git-actions">
-                  <button class="btn" disabled={testBusy || !testToolName.trim()} onclick={() => void runTest(s.name)}>Run tool</button>
+                <div class="row">
+                  <button class="tbtn" disabled={testBusy || !testToolName.trim()} onclick={() => void runTest(s.name)}>Run tool</button>
                 </div>
                 {#if testResult !== null}
                   <pre class="test-out">{testResult}</pre>
@@ -122,7 +122,7 @@
         {:else if session.settingsSection === "skills"}
           <h3>Skills</h3>
           <div class="sub">
-            {(session.config?.skills ?? []).filter((s) => s.enabled).length} of {(session.config?.skills ?? []).length} enabled.
+            {(session.config?.skills ?? []).filter((s) => s.enabled).length} of {(session.config?.skills ?? []).length} enabled. Enabled skills are injected as the agent system prompt.
           </div>
           {#each session.config?.skills ?? [] as s (s.name)}
             <div class="srow">
@@ -173,42 +173,3 @@
     </div>
   </div>
 </div>
-
-<style>
-  .test-panel {
-    margin: 0 0 12px 0;
-    padding: 10px;
-    border: 1px solid var(--border, #2c2c33);
-    border-radius: 8px;
-    background: var(--panel-2, #16161a);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .test-fields {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .test-args,
-  .test-out {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    background: var(--bg, #0f0f12);
-    color: var(--text, #e6e6e6);
-    border: 1px solid var(--border, #2c2c33);
-    border-radius: 6px;
-    padding: 6px 8px;
-  }
-  .test-args {
-    min-height: 48px;
-    resize: vertical;
-  }
-  .test-out {
-    max-height: 180px;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-    margin: 0;
-  }
-</style>

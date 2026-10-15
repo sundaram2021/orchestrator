@@ -323,6 +323,9 @@ export class Orchestrator {
   private async discardThread(threadId: string): Promise<void> {
     if (this.runs.has(threadId)) await this.stopAgent(threadId);
     const thread = this.findThread(threadId);
+    if (thread?.worktree) {
+      await this.deps.adapters.releaseWorkspace(thread.worktree);
+    }
     if (thread?.branch && thread.worktree) {
       await this.deps.worktrees.remove({ branch: thread.branch, dir: thread.worktree });
     }

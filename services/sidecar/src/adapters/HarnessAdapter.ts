@@ -38,6 +38,9 @@ export interface HarnessAdapter {
     options?: TurnOptions,
   ): AsyncIterable<ProviderEvent>;
   interrupt(session: SessionHandle): Promise<void>;
+
+  /** Optional: release pooled processes rooted at a workspace dir (called before a worktree is removed). */
+  disposeWorkspace?(dir: string): Promise<void>;
 }
 
 export interface LaunchableHarness {

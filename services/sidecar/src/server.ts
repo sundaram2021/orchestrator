@@ -42,6 +42,10 @@ export function startServer(
     }
   });
 
+  wss.on("error", (err: Error) => {
+    log.warn(`websocket server error: ${err.message}`);
+  });
+
   bus.on((event: DomainEvent) => {
     const message: ServerPush = { push: "event", event };
     const payload = JSON.stringify(message);

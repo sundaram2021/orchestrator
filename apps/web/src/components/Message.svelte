@@ -19,7 +19,7 @@
         <span class="tag" class:err={tool.ok === false}>{tool.tool}</span>
         {tool.args}
         {#if tool.result}
-          <div style="margin-top:4px;color:var(--muted)">{tool.result}</div>
+          <div class="out">{tool.result}</div>
         {/if}
       </div>
     {/each}

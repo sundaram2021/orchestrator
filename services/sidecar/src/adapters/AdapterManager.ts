@@ -49,4 +49,15 @@ export class AdapterManager {
       }
     }
   }
+
+  async releaseWorkspace(dir: string): Promise<void> {
+    for (const adapter of this.adapters.values()) {
+      if (!adapter.disposeWorkspace) continue;
+      try {
+        await adapter.disposeWorkspace(dir);
+      } catch (err) {
+        log.error(`failed to release ${adapter.id} for ${dir}`, err);
+      }
+    }
+  }
 }

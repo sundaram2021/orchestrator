@@ -11,12 +11,6 @@ import type {
 } from "@orchestrator/contracts";
 import { RpcClient, type ConnState } from "./rpc";
 
-export interface DockMessage {
-  id: string;
-  role: "user" | "system";
-  text: string;
-}
-
 export type EditorView = "code" | "diff" | "markdown";
 export type SettingsSection = "harnesses" | "mcp" | "skills" | "updates";
 
@@ -38,14 +32,12 @@ class Session {
   config = $state<AppConfig | null>(null);
   threads = $state<ThreadView[]>([]);
   connection = $state<ConnState>("connecting");
-  mode = $state<"ide" | "agent">("ide");
+  view = $state<"chat" | "code">("chat");
+  showThreads = $state(true);
   activeThreadId = $state<string | null>(null);
   editorView = $state<EditorView>("code");
   settingsOpen = $state(false);
   settingsSection = $state<SettingsSection>("harnesses");
-  dock = $state<DockMessage[]>([
-    { id: uid(), role: "system", text: "Orchestrator ready. Pick a model below and send an instruction." },
-  ]);
 
   tree = $state<FileNode[]>([]);
   openTabs = $state<string[]>([]);
@@ -221,10 +213,6 @@ class Session {
     }
   }
 
-  private pushDock(role: DockMessage["role"], text: string): void {
-    this.dock.push({ id: uid(), role, text });
-  }
-
   private notify(text: string): void {
     this.toast = text;
     setTimeout(() => {
@@ -235,9 +223,8 @@ class Session {
   async send(prompt: string): Promise<void> {
     const text = prompt.trim();
     if (!text || !this.config) return;
-    const { harness, id, name } = this.config.model;
-    this.pushDock("user", text);
-    this.pushDock("system", `Started agent on ${harness} · ${name}`);
+    const { harness, id } = this.config.model;
+    this.view = "chat";
     await this.client.request("dispatchCommand", {
       kind: "StartThread",
       prompt: text,
@@ -287,9 +274,22 @@ class Session {
     await this.client.request("dispatchCommand", { kind: "SetUpdateSettings", ...patch });
   }
 
-  setMode(mode: "ide" | "agent"): void {
-    this.mode = mode;
+  setView(view: "chat" | "code"): void {
+    this.view = view;
     this.settingsOpen = false;
+  }
+
+  toggleThreads(): void {
+    this.showThreads = !this.showThreads;
+  }
+
+  selectThread(id: string): void {
+    this.activeThreadId = id;
+    this.view = "chat";
+  }
+
+  get activeThread(): ThreadView | undefined {
+    return this.threads.find((t) => t.id === this.activeThreadId);
   }
 
   openSettings(): void {
@@ -366,6 +366,7 @@ class Session {
       if (!this.openTabs.includes(path)) this.openTabs = [...this.openTabs, path];
       this.activeFile = path;
       this.editorView = "code";
+      this.view = "code";
     } catch (err) {
       this.notify(err instanceof Error ? err.message : String(err));
     }
@@ -440,6 +441,7 @@ class Session {
   async openDiff(path: string): Promise<void> {
     this.activeFile = path;
     this.editorView = "diff";
+    this.view = "code";
     await this.loadDiff(path);
   }
 

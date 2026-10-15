@@ -21,7 +21,9 @@ const log = logger("main");
 
 async function main(): Promise<void> {
   const workspace = process.env.ORCHESTRATOR_WORKSPACE ?? process.cwd();
-  const preferredPort = Number(process.env.ORCHESTRATOR_PORT ?? 0) || 4123;
+  const envPort = process.env.ORCHESTRATOR_PORT;
+  const parsedPort = envPort === undefined || envPort === "" ? 4123 : Number(envPort);
+  const preferredPort = Number.isFinite(parsedPort) ? parsedPort : 4123;
 
   const bus = new Broadcaster();
   const store = new EventStore(journalPath(workspace));

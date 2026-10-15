@@ -11,7 +11,7 @@
 
 {#if node.type === "dir"}
   <div
-    class="folder"
+    class="node folder"
     data-path={node.path}
     data-type="dir"
     style="padding-left:{depth * 12 + 8}px"
@@ -21,7 +21,7 @@
     onkeydown={(e) => e.key === "Enter" && session.toggleDir(node.path)}
   >
     <span class="chev">{collapsed ? "▸" : "▾"}</span>
-    {node.name}
+    <span class="nm" style="padding-left:2px">{node.name}</span>
   </div>
   {#if !collapsed}
     {#each node.children ?? [] as child (child.path)}
@@ -30,17 +30,17 @@
   {/if}
 {:else}
   <div
-    class="file"
+    class="node"
     data-path={node.path}
     data-type="file"
     class:active={session.activeFile === node.path}
-    style="padding-left:{depth * 12 + 22}px"
+    style="padding-left:{depth * 12 + 20}px"
     role="button"
     tabindex="0"
     onclick={() => void session.openFile(node.path)}
     onkeydown={(e) => e.key === "Enter" && void session.openFile(node.path)}
   >
-    <span class="ic">{fileIcon(node.name)}</span>
-    {node.name}
+    <span class="fx">{fileIcon(node.name)}</span>
+    <span class="nm">{node.name}</span>
   </div>
 {/if}

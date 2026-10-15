@@ -4,9 +4,8 @@
   import TitleBar from "./components/TitleBar.svelte";
   import FileTree from "./components/FileTree.svelte";
   import EditorPane from "./components/EditorPane.svelte";
-  import AgentArea from "./components/AgentArea.svelte";
-  import HistorySidebar from "./components/HistorySidebar.svelte";
-  import ChatDock from "./components/ChatDock.svelte";
+  import ChatPanel from "./components/ChatPanel.svelte";
+  import ThreadsPanel from "./components/ThreadsPanel.svelte";
   import SettingsModal from "./components/SettingsModal.svelte";
   import StatusBar from "./components/StatusBar.svelte";
 
@@ -15,21 +14,23 @@
   });
 </script>
 
-<div id="app" data-mode={session.mode}>
+<div id="app" data-view={session.view}>
   <TitleBar />
 
   <div class="body">
     <FileTree />
 
     <section class="main">
-      <div class="workspace">
+      {#if session.view === "code"}
         <EditorPane />
-        <AgentArea />
-      </div>
-      <ChatDock />
+      {:else}
+        <ChatPanel />
+      {/if}
     </section>
 
-    <HistorySidebar />
+    {#if session.showThreads}
+      <ThreadsPanel />
+    {/if}
   </div>
 
   {#if session.settingsOpen}

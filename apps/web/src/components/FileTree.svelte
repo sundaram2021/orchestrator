@@ -1,19 +1,37 @@
 <script lang="ts">
+  import type { FileNode } from "@orchestrator/contracts";
   import { session } from "../lib/session.svelte";
   import FileNodeView from "./FileNodeView.svelte";
 
   const git = $derived(session.git);
   const branches = $derived(session.branches);
 
+  let q = $state("");
   type MenuTarget = { x: number; y: number; path: string; type: "file" | "dir" | "root" };
   let menu = $state<MenuTarget | null>(null);
+
+  const filterNodes = (nodes: FileNode[], needle: string): FileNode[] => {
+    const out: FileNode[] = [];
+    for (const node of nodes) {
+      if (node.type === "dir") {
+        const children = filterNodes(node.children ?? [], needle);
+        if (children.length || node.name.toLowerCase().includes(needle)) {
+          out.push({ ...node, children });
+        }
+      } else if (node.name.toLowerCase().includes(needle)) {
+        out.push(node);
+      }
+    }
+    return out;
+  };
+
+  const filtered = $derived(q.trim() ? filterNodes(session.tree, q.trim().toLowerCase()) : session.tree);
 
   const dirname = (p: string): string => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
   const basename = (p: string): string => (p.includes("/") ? p.slice(p.lastIndexOf("/") + 1) : p);
   const join = (a: string, b: string): string => (a ? `${a}/${b}` : b);
-
-  const baseDir = (target: MenuTarget): string =>
-    target.type === "dir" ? target.path : target.type === "file" ? dirname(target.path) : "";
+  const baseDir = (t: MenuTarget): string =>
+    t.type === "dir" ? t.path : t.type === "file" ? dirname(t.path) : "";
 
   const onContext = (event: MouseEvent): void => {
     event.preventDefault();
@@ -60,73 +78,78 @@
 
 <svelte:window onclick={() => (menu = null)} />
 
-<aside class="sidebar-left">
-  <div class="side-title-bar">
-    FILES
+<aside class="explorer">
+  <div class="panel-head">
+    Explorer
     <span class="spacer"></span>
     <button class="icon-btn" title="New file" onclick={(e) => openAtRoot(e.clientX, e.clientY)}>＋</button>
     <button class="icon-btn" title="Refresh" onclick={() => void session.refreshTree()}>⟳</button>
   </div>
+
+  <div class="pad">
+    <input class="search" bind:value={q} placeholder="Search files…" />
+  </div>
+
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="tree" role="tree" tabindex="0" oncontextmenu={onContext}>
-    {#if session.tree.length === 0}
-      <div class="empty" style="padding:8px">No workspace files.</div>
+    {#if filtered.length === 0}
+      <div class="empty" style="padding:8px">{q ? "No matches." : "No workspace files."}</div>
     {:else}
-      {#each session.tree as node (node.path)}
+      {#each filtered as node (node.path)}
         <FileNodeView {node} />
       {/each}
     {/if}
   </div>
 
-  <div class="git-panel">
-    <div class="git-head">
-      <span class="branch">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2" /><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M6 8v8M8 6h6a4 4 0 0 1 4 4v0" /></svg>
-        {git?.branch || "no git"}
-      </span>
-      <span class="spacer"></span>
-      {#if git?.available}
-        <span class="gcount" title="staged">{git.staged}↑</span>
-        <span class="gcount" title="unstaged">{git.unstaged}↓</span>
-      {/if}
-    </div>
-    {#if git?.available}
-      {#if branches && branches.local.length > 1}
-        <select class="branchselect" value={branches.current} onchange={(e) => void session.checkout(e.currentTarget.value)}>
-          {#each branches.local as b (b)}
-            <option value={b}>{b}</option>
-          {/each}
-        </select>
-      {/if}
-      {#if git.files.length > 0}
-        <div class="changelist">
-          {#each git.files as f (f.path)}
-            <div class="chg" class:sel={session.diffPath === f.path}>
-              <button class="chg-name" title={f.path} onclick={() => void session.openDiff(f.path)}>
-                <span class="chg-st">{f.index !== " " && f.index !== "?" ? f.index : "?"}</span>
-                {f.path.split("/").pop()}
-              </button>
-              {#if f.worktree !== " "}
-                <button class="chg-stage" title="Stage file" onclick={() => void session.stageFile(f.path)}>＋</button>
-              {/if}
-            </div>
-          {/each}
+  {#if git?.available}
+    <div class="changes">
+      <div class="changes-head">
+        Changes
+        <span class="count">{git.files.length}</span>
+        <span class="spacer"></span>
+        {#if branches && branches.local.length > 1}
+          <select
+            class="mini-select"
+            style="max-width:130px"
+            value={branches.current}
+            onchange={(e) => void session.checkout(e.currentTarget.value)}
+          >
+            {#each branches.local as b (b)}
+              <option value={b}>{b}</option>
+            {/each}
+          </select>
+        {/if}
+      </div>
+      <div class="changes-list">
+        {#each git.files as f (f.path)}
+          <div class="chg" class:sel={session.diffPath === f.path}>
+            <button class="chg-name" title={f.path} onclick={() => void session.openDiff(f.path)}>
+              <span class="chg-st" class:add={f.index === "A"} class:del={f.index === "D"}>{f.index !== " " && f.index !== "?" ? f.index : "U"}</span>
+              <span class="txt" style="overflow:hidden;text-overflow:ellipsis">{f.path.split("/").pop()}</span>
+            </button>
+            {#if f.worktree !== " "}
+              <button class="chg-stage" title="Stage file" onclick={() => void session.stageFile(f.path)}>＋</button>
+            {/if}
+          </div>
+        {/each}
+        {#if git.files.length === 0}
+          <div class="empty" style="padding:6px 8px">Working tree clean.</div>
+        {/if}
+      </div>
+      <div class="git-form">
+        <input class="search" bind:value={session.commitMessage} placeholder="Commit message…" />
+        <div class="row">
+          <button class="foot-btn" onclick={() => void session.stageAll()}>Stage all</button>
+          <button class="foot-btn" onclick={() => void session.push()}>Push</button>
+          <button class="foot-btn" disabled={!session.commitMessage.trim()} onclick={() => void session.commit()}>Commit</button>
         </div>
-      {/if}
-      <input class="search" bind:value={session.commitMessage} placeholder="Commit message…" />
-      <div class="git-actions">
-        <button class="btn ghost" onclick={() => void session.stageAll()}>Stage all</button>
-        <button class="btn ghost" onclick={() => void session.push()}>Push</button>
-        <button class="btn" disabled={!session.commitMessage.trim()} onclick={() => void session.commit()}>Commit</button>
+        <input class="search" bind:value={session.prTitle} placeholder="PR title…" />
+        <button class="foot-btn" disabled={!session.prTitle.trim()} onclick={() => void session.createPr()}>Open PR</button>
       </div>
-      <input class="search" bind:value={session.prTitle} placeholder="PR title…" />
-      <div class="git-actions">
-        <button class="btn ghost" disabled={!session.prTitle.trim()} onclick={() => void session.createPr()}>Open PR</button>
-      </div>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
-  <div class="side-foot">
+  <div class="explorer-foot">
     <button class="foot-btn" class:active={session.settingsOpen} title="Settings" onclick={() => session.openSettings()}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" /></svg>
       Settings
@@ -145,90 +168,3 @@
     {/if}
   </div>
 {/if}
-
-<style>
-  .ctx-menu {
-    position: fixed;
-    z-index: 60;
-    min-width: 140px;
-    padding: 4px;
-    border-radius: 8px;
-    background: var(--panel, #1b1b1f);
-    border: 1px solid var(--border, #2c2c33);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-    display: flex;
-    flex-direction: column;
-  }
-  .ctx-item {
-    text-align: left;
-    padding: 6px 10px;
-    border: none;
-    background: transparent;
-    color: var(--text, #e6e6e6);
-    font: inherit;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .ctx-item:hover {
-    background: var(--hover, #26262c);
-  }
-  .ctx-item.danger {
-    color: #e57373;
-  }
-  .branchselect {
-    margin: 6px 10px 0;
-    padding: 4px 6px;
-    background: var(--panel2, #202027);
-    color: var(--text, #e6e6e6);
-    border: 1px solid var(--border, #2c2c33);
-    border-radius: 6px;
-    font: inherit;
-    font-size: 12px;
-  }
-  .changelist {
-    margin: 6px 0;
-    max-height: 160px;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-  }
-  .chg {
-    display: flex;
-    align-items: center;
-  }
-  .chg.sel {
-    background: var(--hover, #26262c);
-  }
-  .chg-name {
-    flex: 1;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    padding: 3px 10px;
-    border: none;
-    background: transparent;
-    color: var(--text, #e6e6e6);
-    font: inherit;
-    font-size: 12px;
-    text-align: left;
-    cursor: pointer;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .chg-st {
-    color: var(--muted, #8a8a94);
-    font-family: monospace;
-  }
-  .chg-stage {
-    border: none;
-    background: transparent;
-    color: var(--muted, #8a8a94);
-    cursor: pointer;
-    padding: 2px 8px;
-    font-size: 12px;
-  }
-  .chg-stage:hover {
-    color: var(--text, #e6e6e6);
-  }
-</style>
