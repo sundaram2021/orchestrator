@@ -1,0 +1,21 @@
+PROMPT.md
+  s_0dc3da93d59c81::t_213cb97f8950f3 121-122
+apps/web/src/components/AgentArea.svelte
+  s_0dc3da93d59c81::t_e1605bd8f0f089 2,7-39,45,49-50,55-56,59,63-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3126e4accbe85eee46dedeef7444c0bc1116c39b",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
