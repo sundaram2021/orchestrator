@@ -13,6 +13,10 @@ export const ThreadStartedSchema = z.object({
   title: z.string(),
   harness: z.string(),
   model: z.string(),
+  prompt: z.string().optional(),
+  branch: z.string().optional(),
+  worktree: z.string().optional(),
+  parentId: z.string().optional(),
 });
 
 export const AgentStatusChangedSchema = z.object({

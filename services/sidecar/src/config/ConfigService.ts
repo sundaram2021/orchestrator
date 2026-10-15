@@ -4,6 +4,7 @@ import type { AdapterManager } from "../adapters/AdapterManager.js";
 import type { McpManager } from "../mcp/McpManager.js";
 import type { SkillsLoader } from "../skills/SkillsLoader.js";
 import { configPaths } from "./paths.js";
+import { SettingsStore } from "./SettingsStore.js";
 import { parseOpenCodeModels, buildHarnessModels, type CatalogModel } from "../models/catalog.js";
 import { runCapture } from "../util/process.js";
 import { logger } from "../util/logger.js";
@@ -22,13 +23,13 @@ export class ConfigService {
   private catalog: CatalogModel[] = [];
   private catalogAt = 0;
   private config: AppConfig | null = null;
-  private readonly disabledHarnesses = new Set<string>();
 
   constructor(
     private readonly workspace: string,
     private readonly adapters: AdapterManager,
     private readonly mcp: McpManager,
     private readonly skills: SkillsLoader,
+    private readonly settings: SettingsStore = new SettingsStore(),
   ) {}
 
   private async loadCatalog(): Promise<void> {
@@ -60,7 +61,7 @@ export class ConfigService {
         color,
         status: adapter?.status ?? "disabled",
         detail,
-        enabled: !this.disabledHarnesses.has(id),
+        enabled: this.settings.harnessEnabled(id, true),
         models,
       };
     };
@@ -96,7 +97,7 @@ export class ConfigService {
     const harnesses = this.harnessConfigs();
     const config: AppConfig = {
       workspace: this.workspace,
-      model: this.config?.model ?? this.defaultModel(harnesses),
+      model: this.config?.model ?? this.settings.model ?? this.defaultModel(harnesses),
       harnesses,
       mcp: this.mcp.list(),
       skills: this.skills.list(),
@@ -109,11 +110,11 @@ export class ConfigService {
 
   setModel(model: ModelRef): void {
     if (this.config) this.config.model = model;
+    this.settings.setModel(model);
   }
 
   setHarnessEnabled(id: string, enabled: boolean): void {
-    if (enabled) this.disabledHarnesses.delete(id);
-    else this.disabledHarnesses.add(id);
+    this.settings.setHarness(id, enabled);
     const harness = this.config?.harnesses.find((h) => h.id === id);
     if (harness) harness.enabled = enabled;
   }

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import path from "node:path";
 import type { SkillConfig } from "@orchestrator/contracts";
 import { skillDirs } from "../config/paths.js";
+import { SettingsStore } from "../config/SettingsStore.js";
 
 interface Frontmatter {
   name?: string;
@@ -29,7 +30,7 @@ export function parseSkillFile(file: string): { meta: Frontmatter; body: string 
 export class SkillsLoader {
   private skills: SkillConfig[];
 
-  constructor() {
+  constructor(private readonly settings: SettingsStore = new SettingsStore()) {
     this.skills = this.scan();
   }
 
@@ -43,7 +44,10 @@ export class SkillsLoader {
 
   setEnabled(name: string, enabled: boolean): SkillConfig | undefined {
     const skill = this.skills.find((s) => s.name === name);
-    if (skill) skill.enabled = enabled;
+    if (skill) {
+      skill.enabled = enabled;
+      this.settings.setSkill(name, enabled);
+    }
     return skill;
   }
 
@@ -63,7 +67,12 @@ export class SkillsLoader {
             meta.description ||
             body.split(/\r?\n/).find((l) => l.trim() && !l.startsWith("#"))?.trim() ||
             "";
-          found.set(name, { name, description, path: target, enabled: true });
+          found.set(name, {
+            name,
+            description,
+            path: target,
+            enabled: this.settings.skillEnabled(name, true),
+          });
         } catch {
           continue;
         }

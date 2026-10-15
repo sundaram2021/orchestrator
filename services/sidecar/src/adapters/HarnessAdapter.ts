@@ -15,6 +15,10 @@ export type ProviderEvent =
   | { kind: "done" }
   | { kind: "error"; message: string };
 
+export interface TurnOptions {
+  system?: string;
+}
+
 export interface HarnessAdapter {
   readonly id: string;
   readonly name: string;
@@ -27,7 +31,12 @@ export interface HarnessAdapter {
   stop(): Promise<void>;
   models(): Promise<ModelDescriptor[]>;
   startSession(cwd: string): Promise<SessionHandle>;
-  sendTurn(session: SessionHandle, prompt: string, model: string): AsyncIterable<ProviderEvent>;
+  sendTurn(
+    session: SessionHandle,
+    prompt: string,
+    model: string,
+    options?: TurnOptions,
+  ): AsyncIterable<ProviderEvent>;
   interrupt(session: SessionHandle): Promise<void>;
 }
 

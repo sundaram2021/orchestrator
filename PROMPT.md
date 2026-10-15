@@ -38,9 +38,9 @@ and *dozens of agents run in parallel without stepping on each other*.
 | Editor | Monaco lazy, tabs, syntax, save, markdown preview | `apps/web/src/components/EditorPane.svelte`, `lib/monaco.ts`, `MarkdownPreview.svelte` |
 | Git | status, diff (read-only), branch, stage-all, commit, push | `git/GitService.ts`, `components/DiffView.svelte` |
 | UI shell | TitleBar, FileTree, AgentArea/AgentColumn, ChatDock, HistorySidebar (search+grouping), SettingsModal, StatusBar, ModelSelector (2-level+search) | `apps/web/src/components/*` |
-| Tests | 17 passing | `services/sidecar/src/**/*.test.ts` |
+| Tests | 20 passing | `services/sidecar/src/**/*.test.ts` |
 
-Quality gates currently green: `pnpm typecheck`, `pnpm build`, `pnpm test` (17/17), `cargo build`.
+Quality gates currently green: `pnpm typecheck`, `pnpm build`, `pnpm test` (20/20), `cargo build`.
 
 **Note:** `neatroots` was intentionally removed from `~/.config/opencode/opencode.json` (and from
 the test fixture). Do not re-add it.
@@ -53,7 +53,7 @@ the test fixture). Do not re-add it.
 - Antigravity MCP configs: `~/.gemini/antigravity/mcp_config.json`, `~/.gemini/antigravity-ide/mcp_config.json` (resend/supabase/vercel, `serverUrl` style).
 - Global skill dirs: `~/.agents/skills`, `~/.config/opencode/skills`, `~/.claude/skills`.
 - Runtime dir (outside repo, gitignored): `~/.orchestrator/` → `opencode.merged.json`, `events/`.
-- **The repo has ZERO git commits.** Many features you must build (worktrees, PR, branch) need a commit — make an initial commit early (ask/confirm message) or feature-gate gracefully.
+- The repo has a baseline commit `df1b0e2` (worktrees/branch/PR are unblocked).
 
 ### Hard rules
 - Never copy secrets/tokens into the repo. The bridge file contains tokens (e.g. resend `Authorization`) — keep it in `~/.orchestrator/` mode 0600.
@@ -94,7 +94,7 @@ the test fixture). Do not re-add it.
 
 ## 5. REMAINING WORK (ordered; each item = implement + wire UI + verify)
 
-### Phase 1 — Correctness wiring (things the README claims but aren't actually wired)
+### Phase 1 — Correctness wiring — ✅ DONE (items 1–7)
 1. **Persist user settings across restart.** `ConfigService` model/harness/skill toggles and `McpManager` MCP toggles are in-memory and get overwritten at boot.
    - Write `~/.orchestrator/config.json` (schema in `packages/contracts/config.ts`); load at boot and re-apply **after** `config.assemble()`.
    - Acceptance: toggle model + disable a harness/MCP/skill, restart sidecar, state is restored.
@@ -111,14 +111,14 @@ the test fixture). Do not re-add it.
    - Reuse `McpManager.callTool` for an explicit "Test tool" action in SettingsModal (invoke a tool with JSON args, show result), OR delete the dead path. Do not leave it half-dead.
 7. **`harness.status` event is never emitted** though the schema + read model handle it. Emit it from `AdapterManager.startAll()` where harnesses connect/fail, or remove the schema. Prefer emit.
 
-### Phase 2 — Multi-agent isolation (the headline feature)
+### Phase 2 — Multi-agent isolation (the headline feature) — ✅ 8–10 DONE; 11 pending
 8. **Per-thread git worktree + branch.** Today every agent shares one workspace/cwd.
    - For each `StartThread`, create worktree `~/.orchestrator/worktrees/<threadId>` on branch `orch/<shortId>` from HEAD; set the OpenCode session cwd to it; tag the thread with its branch/worktree.
    - UI: show branch per agent column; buttons to "Open diff", "Merge/PR", "Discard" (remove worktree + branch).
    - Acceptance: two agents editing the same file don't collide; each has an isolated checkout. (Needs ≥1 commit.)
 9. **Per-agent model/harness picker** (currently all threads use the global dock model). Add a picker on `AgentColumn` and pass harness/model in `StartThread`.
-10. **Retry and Fork.** Add `RetryThread` and `ForkThread` commands/events + UI. `OpenCodeServer.fork()` already exists and is unused.
-11. **Virtualize agent columns/history** for dozens of agents (windowing).
+10. **Retry and Fork.** ✅ `RetryThread`/`ForkThread` commands + `DiscardThread`/`MergeThread` + UI; dead `OpenCodeServer.fork()` removed (sibling re-run semantics instead).
+11. **Virtualize agent columns/history** for dozens of agents (windowing). ⬜ PENDING.
 
 ### Phase 3 — Git & review flow
 12. **Code-apply accept/reject.** When an agent turn produces file changes, surface a diff with per-hunk accept/reject that writes to the worktree. (Pairs with worktrees.)
@@ -127,8 +127,7 @@ the test fixture). Do not re-add it.
 15. **Branch switch** (currently branch is display-only) — add a command with a safety check for dirty trees.
 
 ### Phase 4 — Desktop polish & packaging
-16. **Window chrome.** `tauri.conf.json` sets `"decorations": false` and `lib.rs` builds the window programmatically, but `TitleBar.svelte` has three non-functional dots and no drag region/controls.
-   - Add a `data-tauri-drag-region` and wire minimize/maximize/close (via `@tauri-apps/api/window`, already a dep but currently unused). Remove the dead `sidecar_url` command OR use it.
+16. **Window chrome.** ✅ DONE: `data-tauri-drag-region` + minimize/maximize/close wired via `@tauri-apps/api/window`; `core:window:allow-*` capabilities added; dead `sidecar_url` command removed; exit now kills the process tree (`taskkill /T /F`).
 17. **CSP + `removeUnusedCommands`.** `tauri.conf.json` has `"csp": null`; set a strict CSP and enable command trimming.
 18. **Open folder as workspace.** Workspace is fixed at launch (`ORCHESTRATOR_WORKSPACE`). Add a folder picker (Tauri dialog) that restarts/points the sidecar at the chosen workspace.
 19. **Run the full desktop path once:** `pnpm tauri` → window loads bundled UI → sidecar spawns → send a prompt → see a streamed answer. Kill all child process groups on exit (Windows: job object).

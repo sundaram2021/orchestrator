@@ -164,13 +164,6 @@ export class OpenCodeServer {
     await this.request("POST", `/session/${sessionID}/abort`).catch(() => undefined);
   }
 
-  async fork(sessionID: string): Promise<string | null> {
-    const result = (await this.request("POST", `/session/${sessionID}/fork`, {}).catch(() => null)) as
-      | { id?: string }
-      | null;
-    return result?.id ?? null;
-  }
-
   async dispose(): Promise<void> {
     this.sseAbort?.abort();
     this.sseAbort = null;

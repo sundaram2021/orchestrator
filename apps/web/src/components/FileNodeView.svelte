@@ -12,6 +12,8 @@
 {#if node.type === "dir"}
   <div
     class="folder"
+    data-path={node.path}
+    data-type="dir"
     style="padding-left:{depth * 12 + 8}px"
     role="button"
     tabindex="0"
@@ -29,6 +31,8 @@
 {:else}
   <div
     class="file"
+    data-path={node.path}
+    data-type="file"
     class:active={session.activeFile === node.path}
     style="padding-left:{depth * 12 + 22}px"
     role="button"

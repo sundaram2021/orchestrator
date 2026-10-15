@@ -3,6 +3,7 @@ import type { Orchestrator } from "../Orchestrator.js";
 import type { FilesService } from "../files/FilesService.js";
 import type { GitService } from "../git/GitService.js";
 import type { AdapterManager } from "../adapters/AdapterManager.js";
+import type { McpManager } from "../mcp/McpManager.js";
 import { isLaunchable } from "../adapters/HarnessAdapter.js";
 
 const str = (value: unknown, fallback = ""): string => (typeof value === "string" ? value : fallback);
@@ -14,6 +15,7 @@ export interface HandlerDeps {
   files: FilesService;
   git: GitService;
   adapters: AdapterManager;
+  mcp: McpManager;
 }
 
 export class RequestHandlers {
@@ -77,6 +79,10 @@ export class RequestHandlers {
           return { ok: false, detail: "antigravity adapter unavailable" };
         }
         return adapter.launch();
+      }
+      case "mcpCallTool": {
+        const result = await this.deps.mcp.callTool(str(p.server), str(p.tool), rec(p.args));
+        return { ok: true, result };
       }
     }
   }

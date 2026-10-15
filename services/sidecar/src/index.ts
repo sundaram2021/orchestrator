@@ -7,12 +7,14 @@ import { AntigravityAdapter } from "./adapters/AntigravityAdapter.js";
 import { McpManager } from "./mcp/McpManager.js";
 import { SkillsLoader } from "./skills/SkillsLoader.js";
 import { ConfigService } from "./config/ConfigService.js";
+import { SettingsStore } from "./config/SettingsStore.js";
 import { FilesService } from "./files/FilesService.js";
 import { GitService } from "./git/GitService.js";
+import { WorktreeService } from "./git/WorktreeService.js";
 import { RequestHandlers } from "./rpc/RequestHandlers.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { startServer } from "./server.js";
-import { journalPath } from "./config/paths.js";
+import { journalPath, userConfigPath } from "./config/paths.js";
 import { logger } from "./util/logger.js";
 
 const log = logger("main");
@@ -40,16 +42,29 @@ async function main(): Promise<void> {
   adapters.register(new OpenCodeAdapter(), { fallback: true });
   adapters.register(new AntigravityAdapter());
 
-  const mcp = new McpManager();
-  const skills = new SkillsLoader();
-  const config = new ConfigService(workspace, adapters, mcp, skills);
+  const settings = new SettingsStore(userConfigPath);
+  const mcp = new McpManager(undefined, settings);
+  const skills = new SkillsLoader(settings);
+  const config = new ConfigService(workspace, adapters, mcp, skills, settings);
 
-  const orchestrator = new Orchestrator({ workspace, store, readModel, adapters, config, mcp, skills, bus });
+  const worktrees = new WorktreeService(workspace);
+  const orchestrator = new Orchestrator({
+    workspace,
+    store,
+    readModel,
+    adapters,
+    config,
+    mcp,
+    skills,
+    worktrees,
+    bus,
+  });
   const handlers = new RequestHandlers({
     orchestrator,
     files: new FilesService(workspace),
     git: new GitService(workspace),
     adapters,
+    mcp,
   });
 
   await orchestrator.init();

@@ -28,6 +28,10 @@ export const ThreadViewSchema = z.object({
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
   messages: z.array(MessageViewSchema),
+  prompt: z.string().optional(),
+  branch: z.string().optional(),
+  worktree: z.string().optional(),
+  parentId: z.string().optional(),
 });
 export type ThreadView = z.infer<typeof ThreadViewSchema>;
 

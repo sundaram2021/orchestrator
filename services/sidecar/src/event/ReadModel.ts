@@ -42,6 +42,10 @@ export class ReadModel {
           createdAt: now,
           updatedAt: now,
           messages: [],
+          ...(e.prompt ? { prompt: e.prompt } : {}),
+          ...(e.branch ? { branch: e.branch } : {}),
+          ...(e.worktree ? { worktree: e.worktree } : {}),
+          ...(e.parentId ? { parentId: e.parentId } : {}),
         });
         break;
       }

@@ -11,7 +11,6 @@ const FALLBACK_WS: &str = "ws://127.0.0.1:4123";
 
 struct Sidecar {
     child: Mutex<Option<Child>>,
-    ws_url: Arc<Mutex<Option<String>>>,
 }
 
 fn free_port() -> u16 {
@@ -59,14 +58,20 @@ fn spawn_sidecar(workspace: &str, port: u16, ws_url: Arc<Mutex<Option<String>>>)
     Ok(child)
 }
 
-#[tauri::command]
-fn sidecar_url(state: tauri::State<Sidecar>) -> String {
-    state
-        .ws_url
-        .lock()
-        .ok()
-        .and_then(|guard| guard.clone())
-        .unwrap_or_else(|| FALLBACK_WS.to_string())
+fn kill_tree(child: &mut Child) {
+    #[cfg(windows)]
+    {
+        let pid = child.id().to_string();
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid, "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = child.kill();
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -82,9 +87,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Sidecar {
             child: Mutex::new(child),
-            ws_url,
         })
-        .invoke_handler(tauri::generate_handler![sidecar_url])
         .setup(move |app| {
             let mut url = format!("ws://127.0.0.1:{port}");
             for _ in 0..60 {
@@ -120,7 +123,7 @@ pub fn run() {
                 if let Some(state) = app_handle.try_state::<Sidecar>() {
                     if let Ok(mut guard) = state.child.lock() {
                         if let Some(mut child) = guard.take() {
-                            let _ = child.kill();
+                            kill_tree(&mut child);
                         }
                     }
                 }

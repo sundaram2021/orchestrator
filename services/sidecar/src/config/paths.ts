@@ -22,6 +22,10 @@ export const openCodeBridgeConfig = path.join(runtimeDir, "opencode.merged.json"
 
 export const eventsDir = path.join(runtimeDir, "events");
 
+export const userConfigPath = path.join(runtimeDir, "config.json");
+
+export const worktreesDir = path.join(runtimeDir, "worktrees");
+
 export function journalPath(workspace: string): string {
   const key = createHash("sha1").update(workspace).digest("hex").slice(0, 16);
   return path.join(eventsDir, `${key}.jsonl`);

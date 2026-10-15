@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { MessageView } from "@orchestrator/contracts";
+  import MarkdownPreview from "./MarkdownPreview.svelte";
 
   let { message }: { message: MessageView } = $props();
 </script>
@@ -8,7 +9,11 @@
   <div class="msg sys">{message.text}</div>
 {:else}
   <div class="msg {message.role === 'user' ? 'user' : 'asst'}">
-    {message.text}
+    {#if message.role === "assistant"}
+      <MarkdownPreview source={message.text} />
+    {:else}
+      {message.text}
+    {/if}
     {#each message.tools as tool (tool.callId)}
       <div class="tool">
         <span class="tag" class:err={tool.ok === false}>{tool.tool}</span>

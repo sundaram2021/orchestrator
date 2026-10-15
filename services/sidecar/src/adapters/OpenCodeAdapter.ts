@@ -7,7 +7,7 @@ import { logger } from "../util/logger.js";
 import { parseOpenCodeModels } from "../models/catalog.js";
 import { openCodeBridgeConfig } from "../config/paths.js";
 import { OpenCodeServer, type ServerEvent, type ServerModel } from "./OpenCodeServer.js";
-import type { HarnessAdapter, ProviderEvent, SessionHandle } from "./HarnessAdapter.js";
+import type { HarnessAdapter, ProviderEvent, SessionHandle, TurnOptions } from "./HarnessAdapter.js";
 
 const log = logger("adapter:opencode");
 
@@ -175,13 +175,19 @@ export class OpenCodeAdapter implements HarnessAdapter {
     })();
   }
 
-  private runTurn(session: SessionHandle, prompt: string, model: string): AsyncIterable<ProviderEvent> {
+  private runTurn(
+    session: SessionHandle,
+    prompt: string,
+    model: string,
+    system?: string,
+  ): AsyncIterable<ProviderEvent> {
     const children = this.children;
     const externalIds = this.externalIds;
     const modelRef = parseModelRef(model);
+    const fullPrompt = system ? `${system}\n\n${prompt}` : prompt;
 
     async function* run(): AsyncGenerator<ProviderEvent> {
-      const args = ["run", prompt, "--format", "json", "-m", modelRef.model];
+      const args = ["run", fullPrompt, "--format", "json", "-m", modelRef.model];
       if (modelRef.variant) args.push("--variant", modelRef.variant);
       const child = spawnStream("opencode", args, { cwd: session.cwd, env: harnessEnv() });
       children.set(session.id, child);
@@ -254,6 +260,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
     session: SessionHandle,
     prompt: string,
     model: string,
+    system?: string,
   ): AsyncIterable<ProviderEvent> {
     const self = this;
     const modelRef = toServerModel(model);
@@ -280,7 +287,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
         notify?.();
       });
 
-      const post = server.sendMessage(serverID, modelRef, prompt).catch((err: unknown) => {
+      const post = server.sendMessage(serverID, modelRef, prompt, system).catch((err: unknown) => {
         queue.push({ type: "__error", properties: { message: err instanceof Error ? err.message : String(err) } });
         notify?.();
       });
@@ -377,9 +384,14 @@ export class OpenCodeAdapter implements HarnessAdapter {
     return serve();
   }
 
-  sendTurn(session: SessionHandle, prompt: string, model: string): AsyncIterable<ProviderEvent> {
+  sendTurn(
+    session: SessionHandle,
+    prompt: string,
+    model: string,
+    options?: TurnOptions,
+  ): AsyncIterable<ProviderEvent> {
     if (!this.available) return this.simulate(model);
-    if (!this.liveServer) return this.runTurn(session, prompt, model);
+    if (!this.liveServer) return this.runTurn(session, prompt, model, options?.system);
 
     const self = this;
     async function* guarded(): AsyncGenerator<ProviderEvent> {
@@ -388,10 +400,10 @@ export class OpenCodeAdapter implements HarnessAdapter {
       } catch (err) {
         self.liveServer = false;
         log.warn("opencode serve unavailable, falling back to run mode", err instanceof Error ? err.message : err);
-        yield* self.runTurn(session, prompt, model);
+        yield* self.runTurn(session, prompt, model, options?.system);
         return;
       }
-      yield* self.serveTurn(session, prompt, model);
+      yield* self.serveTurn(session, prompt, model, options?.system);
     }
     return guarded();
   }

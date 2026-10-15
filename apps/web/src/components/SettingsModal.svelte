@@ -10,6 +10,32 @@
   const onToggle = (target: "harness" | "mcp" | "skill", id: string, enabled: boolean) => {
     void session.toggle(target, id, enabled);
   };
+
+  let testFor = $state<string | null>(null);
+  let testToolName = $state("");
+  let testArgs = $state("{}");
+  let testResult = $state<string | null>(null);
+  let testBusy = $state(false);
+
+  const toggleTest = (name: string) => {
+    testFor = testFor === name ? null : name;
+    testToolName = "";
+    testArgs = "{}";
+    testResult = null;
+  };
+
+  const runTest = async (server: string) => {
+    testBusy = true;
+    testResult = null;
+    try {
+      const args = JSON.parse(testArgs || "{}") as Record<string, unknown>;
+      testResult = await session.testTool(server, testToolName, args);
+    } catch (err) {
+      testResult = err instanceof Error ? err.message : String(err);
+    } finally {
+      testBusy = false;
+    }
+  };
 </script>
 
 <div
@@ -66,11 +92,31 @@
                 </div>
                 <div class="detail">{s.transport} · {s.source} · {s.detail}{s.tools.length ? ` · ${s.tools.length} tools` : ""}</div>
               </div>
+              {#if s.status === "connected"}
+                <button class="btn ghost" onclick={() => toggleTest(s.name)}>Test</button>
+              {/if}
               <label class="switch">
                 <input type="checkbox" checked={s.enabled} onchange={(e) => onToggle("mcp", s.name, e.currentTarget.checked)} />
                 <span class="slider"></span>
               </label>
             </div>
+            {#if testFor === s.name}
+              <div class="test-panel">
+                <div class="test-fields">
+                  <input class="search" list="tools-{s.name}" bind:value={testToolName} placeholder="tool name" />
+                  <datalist id="tools-{s.name}">
+                    {#each s.tools as t (t)}<option value={t}></option>{/each}
+                  </datalist>
+                  <textarea class="test-args" bind:value={testArgs} placeholder={'{"key":"value"}'}></textarea>
+                </div>
+                <div class="git-actions">
+                  <button class="btn" disabled={testBusy || !testToolName.trim()} onclick={() => void runTest(s.name)}>Run tool</button>
+                </div>
+                {#if testResult !== null}
+                  <pre class="test-out">{testResult}</pre>
+                {/if}
+              </div>
+            {/if}
           {/each}
         {:else}
           <h3>Skills</h3>
@@ -94,3 +140,42 @@
     </div>
   </div>
 </div>
+
+<style>
+  .test-panel {
+    margin: 0 0 12px 0;
+    padding: 10px;
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 8px;
+    background: var(--panel-2, #16161a);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .test-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .test-args,
+  .test-out {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    background: var(--bg, #0f0f12);
+    color: var(--text, #e6e6e6);
+    border: 1px solid var(--border, #2c2c33);
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .test-args {
+    min-height: 48px;
+    resize: vertical;
+  }
+  .test-out {
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+</style>

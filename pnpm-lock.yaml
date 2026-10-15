@@ -30,6 +30,9 @@ importers:
       '@orchestrator/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: ^2.1.1
+        version: 2.12.3
       monaco-editor:
         specifier: ^0.52.2
         version: 0.52.2

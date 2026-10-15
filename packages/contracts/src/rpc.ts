@@ -12,6 +12,10 @@ export const CommandSchema = z.discriminatedUnion("kind", [
     model: z.string(),
   }),
   z.object({ kind: z.literal("StopAgent"), threadId: z.string() }),
+  z.object({ kind: z.literal("RetryThread"), threadId: z.string(), model: z.string().optional() }),
+  z.object({ kind: z.literal("ForkThread"), threadId: z.string() }),
+  z.object({ kind: z.literal("DiscardThread"), threadId: z.string() }),
+  z.object({ kind: z.literal("MergeThread"), threadId: z.string() }),
   z.object({ kind: z.literal("ClearFinished") }),
   z.object({ kind: z.literal("SetModel"), model: ModelRefSchema }),
   z.object({
@@ -41,6 +45,7 @@ export const METHOD_NAMES = [
   "gitCommit",
   "gitPush",
   "launchAntigravity",
+  "mcpCallTool",
 ] as const;
 
 export const ClientRequestSchema = z.object({
@@ -82,6 +87,10 @@ export interface MethodMap {
   gitCommit: { params: { message: string }; result: { ok: boolean; output: string } };
   gitPush: { params: undefined; result: { ok: boolean; output: string } };
   launchAntigravity: { params: undefined; result: { ok: boolean; detail: string } };
+  mcpCallTool: {
+    params: { server: string; tool: string; args: Record<string, unknown> };
+    result: { ok: boolean; result: string };
+  };
 }
 
 export type MethodName = (typeof METHOD_NAMES)[number];

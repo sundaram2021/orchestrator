@@ -11,17 +11,28 @@
   const model = $derived(session.config?.model);
   const dotColor = $derived(harnessOf(model?.harness ?? "")?.color ?? "var(--muted)");
   const mcpCount = $derived(session.config?.mcp.filter((m) => m.enabled).length ?? 0);
+
+  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+  const control = async (action: "minimize" | "maximize" | "close"): Promise<void> => {
+    if (!isTauri) return;
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const win = getCurrentWindow();
+    if (action === "minimize") await win.minimize();
+    else if (action === "maximize") await win.toggleMaximize();
+    else await win.close();
+  };
 </script>
 
-<div class="titlebar">
+<div class="titlebar" data-tauri-drag-region>
   <div class="tl">
-    <div class="dot"></div>
-    <div class="dot"></div>
-    <div class="dot"></div>
+    <button class="dot" title="Close" aria-label="Close window" onclick={() => void control("close")}></button>
+    <button class="dot" title="Minimize" aria-label="Minimize window" onclick={() => void control("minimize")}></button>
+    <button class="dot" title="Maximize" aria-label="Maximize window" onclick={() => void control("maximize")}></button>
   </div>
-  <strong style="margin-left:6px">orchestrator</strong>
-  <span style="color:var(--muted)">— {session.config?.workspace ?? "no workspace"}</span>
-  <div class="spacer"></div>
+  <strong style="margin-left:6px" data-tauri-drag-region>orchestrator</strong>
+  <span style="color:var(--muted)" data-tauri-drag-region>— {session.config?.workspace ?? "no workspace"}</span>
+  <div class="spacer" data-tauri-drag-region></div>
   {#if model}
     <span class="pill" title="Active model">
       <span class="hdot" style="background:{dotColor}"></span>
@@ -41,3 +52,11 @@
     </button>
   </div>
 </div>
+
+<style>
+  .dot {
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+</style>

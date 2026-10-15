@@ -41,3 +41,27 @@ test("removes finished threads", () => {
   rm.apply({ seq: 1, ts: 1, event: { type: "thread.removed", threadId: "t1" } });
   assert.equal(rm.snapshot().threads.length, 0);
 });
+
+test("captures worktree, prompt and parent on thread.started", () => {
+  const rm = new ReadModel(config);
+  rm.apply({
+    seq: 0,
+    ts: 0,
+    event: {
+      type: "thread.started",
+      threadId: "t2",
+      title: "fix",
+      harness: "opencode",
+      model: "m",
+      prompt: "fix the bug",
+      branch: "orch/abc",
+      worktree: "/tmp/wt",
+      parentId: "t1",
+    },
+  });
+  const thread = rm.snapshot().threads[0];
+  assert.equal(thread?.branch, "orch/abc");
+  assert.equal(thread?.worktree, "/tmp/wt");
+  assert.equal(thread?.prompt, "fix the bug");
+  assert.equal(thread?.parentId, "t1");
+});

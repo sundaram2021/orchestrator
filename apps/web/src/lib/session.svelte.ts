@@ -62,12 +62,25 @@ class Session {
   async init(): Promise<void> {
     this.client.onState((state) => {
       this.connection = state;
-      if (state !== "open") this.client.pause();
+      if (state === "open") void this.onOpen();
+      else this.client.pause();
     });
     this.client.onEvent((event) => this.applyEvent(event));
     this.client.onEvent(() => this.ensureActive());
     await this.bootstrap();
     this.client.connect();
+  }
+
+  private async onOpen(): Promise<void> {
+    if (this.lastSeq >= 0) {
+      try {
+        const missed = await this.client.request("replayEvents", { fromSeq: this.lastSeq + 1 });
+        for (const event of missed) this.applyEvent(event);
+      } catch {
+        /* next reconnect retries */
+      }
+    }
+    this.client.resume();
   }
 
   private async bootstrap(): Promise<void> {
@@ -114,6 +127,10 @@ class Session {
           createdAt: now,
           updatedAt: now,
           messages: [],
+          ...(e.prompt ? { prompt: e.prompt } : {}),
+          ...(e.branch ? { branch: e.branch } : {}),
+          ...(e.worktree ? { worktree: e.worktree } : {}),
+          ...(e.parentId ? { parentId: e.parentId } : {}),
         });
         if (!this.activeThreadId) this.activeThreadId = e.threadId;
         break;
@@ -227,6 +244,22 @@ class Session {
     await this.client.request("dispatchCommand", { kind: "ClearFinished" });
   }
 
+  async retryThread(threadId: string, model?: string): Promise<void> {
+    await this.client.request("dispatchCommand", { kind: "RetryThread", threadId, ...(model ? { model } : {}) });
+  }
+
+  async forkThread(threadId: string): Promise<void> {
+    await this.client.request("dispatchCommand", { kind: "ForkThread", threadId });
+  }
+
+  async discardThread(threadId: string): Promise<void> {
+    await this.client.request("dispatchCommand", { kind: "DiscardThread", threadId });
+  }
+
+  async mergeThread(threadId: string): Promise<void> {
+    await this.client.request("dispatchCommand", { kind: "MergeThread", threadId });
+  }
+
   async selectModel(model: ModelRef): Promise<void> {
     if (this.config) this.config.model = model;
     await this.client.request("dispatchCommand", { kind: "SetModel", model });
@@ -251,6 +284,51 @@ class Session {
 
   toggleDir(path: string): void {
     this.collapsed = { ...this.collapsed, [path]: !this.collapsed[path] };
+  }
+
+  async createPath(path: string, type: "file" | "dir"): Promise<void> {
+    try {
+      await this.client.request("createPath", { path, type });
+      if (type === "file") await this.openFile(path);
+      await this.refreshTree();
+      await this.refreshGit();
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async renamePath(from: string, to: string): Promise<void> {
+    try {
+      await this.client.request("renamePath", { from, to });
+      const contents = { ...this.fileContents };
+      if (contents[from] !== undefined) {
+        contents[to] = contents[from]!;
+        delete contents[from];
+        this.fileContents = contents;
+      }
+      this.openTabs = this.openTabs.map((t) => (t === from ? to : t));
+      if (this.activeFile === from) this.activeFile = to;
+      await this.refreshTree();
+      await this.refreshGit();
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async deletePath(path: string): Promise<void> {
+    try {
+      await this.client.request("deletePath", { path });
+      this.closeTab(path);
+      await this.refreshTree();
+      await this.refreshGit();
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async testTool(server: string, tool: string, args: Record<string, unknown>): Promise<string> {
+    const result = await this.client.request("mcpCallTool", { server, tool, args });
+    return result.result;
   }
 
   async refreshTree(): Promise<void> {
@@ -354,3 +432,7 @@ export const session = new Session();
 export const harnessOf = (id: string) => session.config?.harnesses.find((h) => h.id === id);
 export const harnessName = (id: string) => harnessOf(id)?.name ?? id;
 export const runningCount = () => session.threads.filter((t) => t.status === "running").length;
+export const allModels = (): Array<{ id: string; name: string; harness: string }> =>
+  (session.config?.harnesses ?? [])
+    .filter((h) => h.enabled)
+    .flatMap((h) => h.models.map((m) => ({ id: m.id, name: m.name, harness: h.id })));

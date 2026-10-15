@@ -2,6 +2,7 @@ import type { McpServerConfig, McpStatus } from "@orchestrator/contracts";
 import { loadMcpServers, type LoadedMcpServer } from "./mcpConfig.js";
 import { connectHttp, connectStdio, type McpConnection } from "./McpClient.js";
 import { OpenCodeMcpBridge } from "./OpenCodeMcpBridge.js";
+import { SettingsStore } from "../config/SettingsStore.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("mcp");
@@ -12,9 +13,15 @@ export class McpManager {
   private readonly listeners = new Set<(server: McpServerConfig) => void>();
   private readonly bridge: OpenCodeMcpBridge;
 
-  constructor(bridge: OpenCodeMcpBridge = new OpenCodeMcpBridge()) {
+  constructor(
+    bridge: OpenCodeMcpBridge = new OpenCodeMcpBridge(),
+    private readonly settings: SettingsStore = new SettingsStore(),
+  ) {
     this.bridge = bridge;
     this.servers = loadMcpServers();
+    for (const server of this.servers) {
+      server.config.enabled = this.settings.mcpEnabled(server.config.name, server.config.enabled);
+    }
     this.syncBridge();
   }
 
@@ -49,6 +56,7 @@ export class McpManager {
     const server = this.find(name);
     if (!server) return undefined;
     server.config.enabled = enabled;
+    this.settings.setMcp(name, enabled);
     this.syncBridge();
     if (enabled) {
       this.update(server.config, "connecting");

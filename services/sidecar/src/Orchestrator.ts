@@ -15,6 +15,7 @@ import type { HarnessAdapter, SessionHandle } from "./adapters/HarnessAdapter.js
 import type { ConfigService } from "./config/ConfigService.js";
 import type { McpManager } from "./mcp/McpManager.js";
 import type { SkillsLoader } from "./skills/SkillsLoader.js";
+import type { WorktreeService } from "./git/WorktreeService.js";
 import { uid, truncate } from "./util/ids.js";
 import { logger } from "./util/logger.js";
 
@@ -35,6 +36,7 @@ export interface OrchestratorDeps {
   config: ConfigService;
   mcp: McpManager;
   skills: SkillsLoader;
+  worktrees: WorktreeService;
   bus: Broadcaster;
 }
 
@@ -60,9 +62,13 @@ export class Orchestrator {
   }
 
   async init(): Promise<void> {
+    await this.deps.adapters.startAll();
     const config = await this.deps.config.assemble();
     this.deps.readModel.setConfig(config);
-    await this.deps.adapters.startAll();
+    this.emit({ type: "config.changed", config });
+    for (const adapter of this.deps.adapters.list()) {
+      this.emit({ type: "harness.status", harnessId: adapter.id, status: adapter.status });
+    }
     for (const thread of this.deps.readModel.snapshot().threads) {
       if (thread.status === "running") {
         this.emit({ type: "agent.status", threadId: thread.id, status: "stopped" });
@@ -91,6 +97,18 @@ export class Orchestrator {
       case "StopAgent":
         await this.stopAgent(command.threadId);
         break;
+      case "RetryThread":
+        this.retryThread(command.threadId, command.model);
+        break;
+      case "ForkThread":
+        this.forkThread(command.threadId);
+        break;
+      case "DiscardThread":
+        await this.discardThread(command.threadId);
+        break;
+      case "MergeThread":
+        await this.mergeThread(command.threadId);
+        break;
       case "ClearFinished":
         this.clearFinished();
         break;
@@ -105,14 +123,23 @@ export class Orchestrator {
     return { accepted: true };
   }
 
-  private async startThread(prompt: string, harness: string, model: string): Promise<void> {
+  private async startThread(
+    prompt: string,
+    harness: string,
+    model: string,
+    parentId?: string,
+  ): Promise<void> {
     const threadId = uid("th_");
+    const worktree = await this.deps.worktrees.create(threadId).catch(() => null);
     this.emit({
       type: "thread.started",
       threadId,
       title: truncate(prompt),
       harness,
       model,
+      prompt,
+      ...(worktree ? { branch: worktree.branch, worktree: worktree.dir } : {}),
+      ...(parentId ? { parentId } : {}),
     });
 
     const executor = this.deps.adapters.executorFor(harness);
@@ -121,7 +148,7 @@ export class Orchestrator {
       return;
     }
 
-    const session = await executor.startSession(this.deps.workspace);
+    const session = await executor.startSession(worktree?.dir ?? this.deps.workspace);
     const run: Run = { threadId, session, executor, stopped: false };
     this.runs.set(threadId, run);
 
@@ -146,7 +173,8 @@ export class Orchestrator {
     };
 
     try {
-      for await (const evt of executor.sendTurn(session, effectivePrompt, model)) {
+      const options = skillPrompt ? { system: skillPrompt } : undefined;
+      for await (const evt of executor.sendTurn(session, effectivePrompt, model, options)) {
         if (run.stopped) break;
         switch (evt.kind) {
           case "system":
@@ -196,6 +224,53 @@ export class Orchestrator {
     for (const thread of threads) {
       if (thread.status !== "running") this.emit({ type: "thread.removed", threadId: thread.id });
     }
+  }
+
+  private findThread(threadId: string): ThreadView | undefined {
+    return this.deps.readModel.snapshot().threads.find((t) => t.id === threadId);
+  }
+
+  private retryThread(threadId: string, model?: string): void {
+    const thread = this.findThread(threadId);
+    if (!thread) return;
+    void this.startThread(thread.prompt ?? thread.title, thread.harness, model ?? thread.model, thread.id);
+  }
+
+  private forkThread(threadId: string): void {
+    const thread = this.findThread(threadId);
+    if (!thread) return;
+    void this.startThread(thread.prompt ?? thread.title, thread.harness, thread.model, thread.id);
+  }
+
+  private async discardThread(threadId: string): Promise<void> {
+    if (this.runs.has(threadId)) await this.stopAgent(threadId);
+    const thread = this.findThread(threadId);
+    if (thread?.branch && thread.worktree) {
+      await this.deps.worktrees.remove({ branch: thread.branch, dir: thread.worktree });
+    }
+    this.emit({ type: "thread.removed", threadId });
+  }
+
+  private async mergeThread(threadId: string): Promise<void> {
+    const thread = this.findThread(threadId);
+    if (!thread?.branch) {
+      this.emit({
+        type: "message.appended",
+        threadId,
+        messageId: uid("m"),
+        role: "system",
+        text: "Nothing to merge — this thread has no isolated branch.",
+      });
+      return;
+    }
+    const res = await this.deps.worktrees.merge(thread.branch);
+    this.emit({
+      type: "message.appended",
+      threadId,
+      messageId: uid("m"),
+      role: "system",
+      text: res.ok ? `Merged ${thread.branch} into the workspace.` : `Merge failed: ${res.output || "unknown error"}`,
+    });
   }
 
   private async setEnabled(target: "harness" | "mcp" | "skill", id: string, enabled: boolean): Promise<void> {

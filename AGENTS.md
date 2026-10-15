@@ -89,3 +89,28 @@ apps/desktop         Tauri 2 shell (Rust) — requires `rustup`/cargo
   (buffered, 100 ms / 256-event flush; `close()` flushes on shutdown). `index.ts` calls
   `store.load()` and replays into the `ReadModel` before boot; old `running` threads are marked
   `stopped` on startup. Journals are per-workspace and can contain config snapshots (no secrets).
+- **User settings** persist to `~/.orchestrator/config.json` via `config/SettingsStore.ts`
+  (`model`, and per-id `harnesses`/`mcp`/`skills` boolean overrides). Re-applied after
+  `config.assemble()` so toggles survive restart. `SettingsStore` with no file path is in-memory
+  (used by unit tests).
+- On WS reopen the client calls `replayEvents(lastSeq + 1)` (`session.svelte.ts onOpen`) to
+  recover events missed while disconnected.
+
+## Multi-agent isolation (verified)
+- Each `StartThread` gets its own git worktree at `~/.orchestrator/worktrees/<threadId>` on
+  branch `orch/<shortId>` (`git/WorktreeService.ts`, from `HEAD`). The OpenCode session cwd is the
+  worktree, so parallel agents never collide. Requires the workspace to be a git repo with ≥1
+  commit; otherwise the thread falls back to the shared workspace (no `branch`/`worktree`).
+- `thread.started` carries optional `prompt`, `branch`, `worktree`, `parentId`; commands
+  `RetryThread`/`ForkThread` re-run a thread's prompt as a new isolated thread, `MergeThread`
+  merges its branch into the workspace, `DiscardThread` removes the worktree + branch.
+- Enabled skills are injected as the real system prompt (`HarnessAdapter.sendTurn` `TurnOptions.system`
+  → `OpenCodeServer.sendMessage({ system })`), not just shown in the UI.
+- Frameless window: `TitleBar.svelte` wires minimize/maximize/close via `@tauri-apps/api/window`
+  (guarded by `__TAURI_INTERNALS__`); drag regions use `data-tauri-drag-region`; capabilities
+  grant `core:window:allow-{minimize,toggle-maximize,close,start-dragging}`. On exit the Rust
+  side kills the whole process tree (`taskkill /T /F`) so `opencode serve` is not orphaned.
+
+## MCP test-tool (verified)
+- `mcpCallTool` RPC → `McpManager.callTool`; SettingsModal exposes a per-server "Test" panel
+  (tool name via datalist + JSON args) for connected servers.
