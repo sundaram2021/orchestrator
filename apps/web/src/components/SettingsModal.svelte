@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { Blocks, Plug, Sparkles, Download, ExternalLink } from "@lucide/svelte";
   import { session, type SettingsSection } from "../lib/session.svelte";
+  import ProviderIcon from "./ProviderIcon.svelte";
 
-  const sections: Array<{ id: SettingsSection; label: string }> = [
-    { id: "harnesses", label: "Harnesses" },
-    { id: "mcp", label: "MCP Servers" },
-    { id: "skills", label: "Skills" },
-    { id: "updates", label: "Updates" },
+  const sections: Array<{ id: SettingsSection; label: string; icon: typeof Blocks }> = [
+    { id: "harnesses", label: "Harnesses", icon: Blocks },
+    { id: "mcp", label: "MCP Servers", icon: Plug },
+    { id: "skills", label: "Skills", icon: Sparkles },
+    { id: "updates", label: "Updates", icon: Download },
   ];
 
   const onToggle = (target: "harness" | "mcp" | "skill", id: string, enabled: boolean): void => {
@@ -17,6 +19,21 @@
   let testArgs = $state("{}");
   let testResult = $state<string | null>(null);
   let testBusy = $state(false);
+  let callbackUrl = $state("");
+  let installBusy = $state(false);
+
+  $effect(() => {
+    void session.refreshAntigravity();
+  });
+
+  const install = async (): Promise<void> => {
+    installBusy = true;
+    try {
+      await session.installAntigravity();
+    } finally {
+      installBusy = false;
+    }
+  };
 
   const toggleTest = (name: string): void => {
     testFor = testFor === name ? null : name;
@@ -49,12 +66,13 @@
       <strong id="settingsTitle">Settings</strong>
       <span class="sub">Harnesses, MCP servers, skills and updates</span>
       <div class="spacer"></div>
-      <button class="tbtn" onclick={() => session.closeSettings()}>Close</button>
+      <button class="btn" onclick={() => session.closeSettings()}>Close</button>
     </div>
     <div class="modal-body">
       <nav class="settings-nav">
         {#each sections as section (section.id)}
           <button class:active={session.settingsSection === section.id} onclick={() => (session.settingsSection = section.id)}>
+            <section.icon size={14} />
             {section.label}
           </button>
         {/each}
@@ -65,7 +83,7 @@
           <div class="sub">Agent runtimes the orchestrator connects to.</div>
           {#each session.config?.harnesses ?? [] as h (h.id)}
             <div class="srow">
-              <span class="hdot" style="background:{h.color};width:9px;height:9px"></span>
+              <ProviderIcon id={h.id} color={h.color} size={24} />
               <div class="grow">
                 <div class="name">
                   {h.name}
@@ -78,6 +96,45 @@
                 <span class="slider"></span>
               </label>
             </div>
+            {#if h.id === "antigravity" && session.antigravity}
+              <div class="test-panel">
+                {#if !session.antigravity.installed}
+                  <div class="row">
+                    <button class="btn" disabled={installBusy} onclick={() => void install()}>
+                      {installBusy ? "Installing…" : "Install Antigravity agent"}
+                    </button>
+                    <span class="detail">Downloads the official Antigravity ACP agent (~120 MB).</span>
+                  </div>
+                {:else if !session.antigravity.signedIn}
+                  <div class="row">
+                    <button class="btn" onclick={() => void session.signInAntigravity()}>Sign in with Google</button>
+                  </div>
+                  {#if session.antigravityAuthUrl}
+                    <div class="detail">
+                      Open the link, approve access, then paste the final redirect URL below.
+                    </div>
+                    <a class="search" href={session.antigravityAuthUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink size={12} /> Open Google sign-in
+                    </a>
+                    <div class="test-fields">
+                      <input class="search" bind:value={callbackUrl} placeholder="http://127.0.0.1:…/?code=…" />
+                    </div>
+                    <div class="row">
+                      <button
+                        class="btn"
+                        disabled={!callbackUrl.trim()}
+                        onclick={() => void session.completeAntigravitySignIn(callbackUrl)}
+                      >
+                        Complete sign-in
+                      </button>
+                      <button class="btn" onclick={() => void session.cancelAntigravitySignIn()}>Cancel</button>
+                    </div>
+                  {/if}
+                {:else}
+                  <div class="detail">Signed in. Antigravity models are ready to run.</div>
+                {/if}
+              </div>
+            {/if}
           {/each}
         {:else if session.settingsSection === "mcp"}
           <h3>MCP Servers</h3>
@@ -94,7 +151,7 @@
                 <div class="detail">{s.transport} · {s.source} · {s.detail}{s.tools.length ? ` · ${s.tools.length} tools` : ""}</div>
               </div>
               {#if s.status === "connected"}
-                <button class="tbtn" onclick={() => toggleTest(s.name)}>Test</button>
+                <button class="btn" onclick={() => toggleTest(s.name)}>Test</button>
               {/if}
               <label class="switch">
                 <input type="checkbox" checked={s.enabled} onchange={(e) => onToggle("mcp", s.name, e.currentTarget.checked)} />
@@ -111,7 +168,7 @@
                   <textarea class="test-args" bind:value={testArgs} placeholder={'{"key":"value"}'}></textarea>
                 </div>
                 <div class="row">
-                  <button class="tbtn" disabled={testBusy || !testToolName.trim()} onclick={() => void runTest(s.name)}>Run tool</button>
+                  <button class="btn" disabled={testBusy || !testToolName.trim()} onclick={() => void runTest(s.name)}>Run tool</button>
                 </div>
                 {#if testResult !== null}
                   <pre class="test-out">{testResult}</pre>

@@ -1,5 +1,7 @@
 import type {
+  AntigravityStatus,
   AppConfig,
+  Attachment,
   Checkpoint,
   DomainEvent,
   FileNode,
@@ -32,8 +34,10 @@ class Session {
   config = $state<AppConfig | null>(null);
   threads = $state<ThreadView[]>([]);
   connection = $state<ConnState>("connecting");
-  view = $state<"chat" | "code">("chat");
-  showThreads = $state(true);
+  view = $state<"chat" | "editor">("chat");
+  showRight = $state(true);
+  rightTab = $state<"files" | "changes">("changes");
+  favorites = $state<string[]>([]);
   activeThreadId = $state<string | null>(null);
   editorView = $state<EditorView>("code");
   settingsOpen = $state(false);
@@ -54,6 +58,8 @@ class Session {
   prTitle = $state("");
   prBody = $state("");
   checkpoints = $state<Record<string, Checkpoint[]>>({});
+  antigravity = $state<AntigravityStatus | null>(null);
+  antigravityAuthUrl = $state<string | null>(null);
   toast = $state<string | null>(null);
 
   private lastSeq = -1;
@@ -95,6 +101,7 @@ class Session {
       this.client.resume();
       void this.refreshTree();
       void this.refreshGit();
+      void this.refreshAntigravity();
     } catch {
       setTimeout(() => void this.bootstrap(), 1000);
     }
@@ -133,6 +140,7 @@ class Session {
           ...(e.branch ? { branch: e.branch } : {}),
           ...(e.worktree ? { worktree: e.worktree } : {}),
           ...(e.parentId ? { parentId: e.parentId } : {}),
+          ...(e.attachments ? { attachments: e.attachments } : {}),
         });
         if (!this.activeThreadId) this.activeThreadId = e.threadId;
         break;
@@ -153,6 +161,12 @@ class Session {
         if (msg) msg.text += e.delta;
         break;
       }
+      case "message.reasoning": {
+        const t = this.findThread(e.threadId);
+        const msg = t?.messages.find((m) => m.id === e.messageId);
+        if (msg) msg.reasoning = (msg.reasoning ?? "") + e.delta;
+        break;
+      }
       case "tool.called": {
         const t = this.findThread(e.threadId);
         if (!t) break;
@@ -162,7 +176,7 @@ class Session {
             ? last
             : { id: uid(), role: "assistant", text: "", tools: [] };
         if (target !== last) t.messages.push(target);
-        target.tools.push({ callId: e.callId, tool: e.tool, args: e.args });
+        target.tools.push({ callId: e.callId, tool: e.tool, args: e.args, startedAt: event.ts });
         break;
       }
       case "tool.result": {
@@ -173,6 +187,7 @@ class Session {
           if (tool) {
             tool.ok = e.ok;
             tool.result = e.result;
+            tool.endedAt = event.ts;
             break;
           }
         }
@@ -189,6 +204,11 @@ class Session {
       case "thread.removed": {
         this.threads = this.threads.filter((t) => t.id !== e.threadId);
         this.ensureActive();
+        break;
+      }
+      case "usage.updated": {
+        const t = this.findThread(e.threadId);
+        if (t) t.usage = e.usage;
         break;
       }
       case "config.changed": {
@@ -220,7 +240,7 @@ class Session {
     }, 3200);
   }
 
-  async send(prompt: string): Promise<void> {
+  async send(prompt: string, attachments?: Attachment[]): Promise<void> {
     const text = prompt.trim();
     if (!text || !this.config) return;
     const { harness, id } = this.config.model;
@@ -230,6 +250,7 @@ class Session {
       prompt: text,
       harness,
       model: id,
+      ...(attachments?.length ? { attachments } : {}),
     });
   }
 
@@ -239,6 +260,10 @@ class Session {
 
   async clearFinished(): Promise<void> {
     await this.client.request("dispatchCommand", { kind: "ClearFinished" });
+  }
+
+  async clearAll(): Promise<void> {
+    await this.client.request("dispatchCommand", { kind: "ClearAll" });
   }
 
   async retryThread(threadId: string, model?: string): Promise<void> {
@@ -274,18 +299,54 @@ class Session {
     await this.client.request("dispatchCommand", { kind: "SetUpdateSettings", ...patch });
   }
 
-  setView(view: "chat" | "code"): void {
+  setView(view: "chat" | "editor"): void {
     this.view = view;
     this.settingsOpen = false;
   }
 
-  toggleThreads(): void {
-    this.showThreads = !this.showThreads;
+  toggleRight(): void {
+    this.showRight = !this.showRight;
+  }
+
+  setRightTab(tab: "files" | "changes"): void {
+    this.rightTab = tab;
+    this.showRight = true;
+  }
+
+  toggleRightTab(tab: "files" | "changes"): void {
+    if (this.showRight && this.rightTab === tab) {
+      this.showRight = false;
+    } else {
+      this.rightTab = tab;
+      this.showRight = true;
+    }
+  }
+
+  toggleFavorite(id: string): void {
+    this.favorites = this.favorites.includes(id)
+      ? this.favorites.filter((f) => f !== id)
+      : [...this.favorites, id];
   }
 
   selectThread(id: string): void {
     this.activeThreadId = id;
     this.view = "chat";
+  }
+
+  newAgent(): void {
+    this.activeThreadId = null;
+    this.view = "chat";
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("orchestrator:focus-composer"));
+    }
+  }
+
+  suggest(text: string): void {
+    this.activeThreadId = null;
+    this.view = "chat";
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("orchestrator:set-composer", { detail: text }));
+    }
   }
 
   get activeThread(): ThreadView | undefined {
@@ -366,7 +427,7 @@ class Session {
       if (!this.openTabs.includes(path)) this.openTabs = [...this.openTabs, path];
       this.activeFile = path;
       this.editorView = "code";
-      this.view = "code";
+      this.view = "editor";
     } catch (err) {
       this.notify(err instanceof Error ? err.message : String(err));
     }
@@ -441,7 +502,7 @@ class Session {
   async openDiff(path: string): Promise<void> {
     this.activeFile = path;
     this.editorView = "diff";
-    this.view = "code";
+    this.view = "editor";
     await this.loadDiff(path);
   }
 
@@ -514,9 +575,62 @@ class Session {
     await this.refreshGit();
   }
 
-  async launchAntigravity(): Promise<void> {
-    const result = await this.client.request("launchAntigravity");
-    this.notify(result.ok ? "Launching Antigravity IDE" : `Antigravity: ${result.detail}`);
+  async commitAndPush(): Promise<void> {
+    const message = this.commitMessage.trim();
+    if (!message) return;
+    const committed = await this.client.request("gitCommit", { message });
+    if (!committed.ok) {
+      this.notify(committed.output || "Commit failed");
+      return;
+    }
+    this.commitMessage = "";
+    const pushed = await this.client.request("gitPush");
+    this.notify(pushed.ok ? "Committed & pushed" : pushed.output || "Push failed");
+    await this.refreshGit();
+  }
+
+  async refreshAntigravity(): Promise<void> {
+    try {
+      this.antigravity = await this.client.request("antigravityStatus");
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async installAntigravity(): Promise<void> {
+    this.notify("Installing Antigravity agent…");
+    try {
+      this.antigravity = await this.client.request("installAntigravity");
+      this.notify("Antigravity agent installed");
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async signInAntigravity(): Promise<void> {
+    this.antigravityAuthUrl = null;
+    try {
+      const result = await this.client.request("antigravitySignIn");
+      this.antigravityAuthUrl = result.url;
+      this.notify("Open the sign-in link to authenticate with Google.");
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async completeAntigravitySignIn(callbackUrl: string): Promise<void> {
+    try {
+      const result = await this.client.request("antigravitySignInComplete", { callbackUrl });
+      this.notify(result.ok ? "Antigravity signed in" : "Sign-in callback failed");
+      await this.refreshAntigravity();
+    } catch (err) {
+      this.notify(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async cancelAntigravitySignIn(): Promise<void> {
+    this.antigravityAuthUrl = null;
+    await this.client.request("antigravitySignInCancel");
   }
 
   async openWorkspace(): Promise<void> {

@@ -46,6 +46,7 @@ export class ReadModel {
           ...(e.branch ? { branch: e.branch } : {}),
           ...(e.worktree ? { worktree: e.worktree } : {}),
           ...(e.parentId ? { parentId: e.parentId } : {}),
+          ...(e.attachments ? { attachments: e.attachments } : {}),
         });
         break;
       }
@@ -74,6 +75,15 @@ export class ReadModel {
         }
         break;
       }
+      case "message.reasoning": {
+        const t = this.threads.get(e.threadId);
+        const msg = t?.messages.find((m) => m.id === e.messageId);
+        if (t && msg) {
+          msg.reasoning = (msg.reasoning ?? "") + e.delta;
+          this.touch(t);
+        }
+        break;
+      }
       case "tool.called": {
         const t = this.threads.get(e.threadId);
         if (t) {
@@ -83,7 +93,7 @@ export class ReadModel {
               ? last
               : { id: uid("m"), role: "assistant", text: "", tools: [] };
           if (target !== last) t.messages.push(target);
-          target.tools.push({ callId: e.callId, tool: e.tool, args: e.args });
+          target.tools.push({ callId: e.callId, tool: e.tool, args: e.args, startedAt: event.ts });
           this.touch(t);
         }
         break;
@@ -96,6 +106,7 @@ export class ReadModel {
             if (tool) {
               tool.ok = e.ok;
               tool.result = e.result;
+              tool.endedAt = event.ts;
               break;
             }
           }
@@ -114,6 +125,14 @@ export class ReadModel {
       }
       case "thread.removed": {
         this.threads.delete(e.threadId);
+        break;
+      }
+      case "usage.updated": {
+        const t = this.threads.get(e.threadId);
+        if (t) {
+          t.usage = e.usage;
+          this.touch(t);
+        }
         break;
       }
       case "config.changed": {

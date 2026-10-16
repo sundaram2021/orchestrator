@@ -9,6 +9,7 @@ import {
 import type { Orchestrator } from "./Orchestrator.js";
 import type { Broadcaster } from "./Broadcaster.js";
 import type { RequestHandlers } from "./rpc/RequestHandlers.js";
+import { createMcpHandler } from "./mcp/OrchestratorMcpServer.js";
 import { logger } from "./util/logger.js";
 
 const log = logger("server");
@@ -24,10 +25,16 @@ export function startServer(
   bus: Broadcaster,
   preferredPort: number,
 ): Promise<ServerHandle> {
+  const mcpHandler = createMcpHandler(orchestrator);
   const httpServer = http.createServer((req, res) => {
-    if (req.url === "/health") {
+    const path = req.url?.split("?")[0] ?? "";
+    if (path === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true, status: orchestrator.snapshot().status }));
+      return;
+    }
+    if (path === "/mcp") {
+      mcpHandler(req, res);
       return;
     }
     res.writeHead(404).end();

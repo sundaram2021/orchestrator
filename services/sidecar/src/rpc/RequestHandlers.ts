@@ -3,8 +3,8 @@ import type { Orchestrator } from "../Orchestrator.js";
 import type { FilesService } from "../files/FilesService.js";
 import type { GitService } from "../git/GitService.js";
 import type { AdapterManager } from "../adapters/AdapterManager.js";
+import type { AntigravityHarness } from "../adapters/AntigravityHarness.js";
 import type { McpManager } from "../mcp/McpManager.js";
-import { isLaunchable } from "../adapters/HarnessAdapter.js";
 
 const str = (value: unknown, fallback = ""): string => (typeof value === "string" ? value : fallback);
 const rec = (value: unknown): Record<string, unknown> =>
@@ -16,6 +16,7 @@ export interface HandlerDeps {
   git: GitService;
   adapters: AdapterManager;
   mcp: McpManager;
+  antigravity: AntigravityHarness;
 }
 
 export class RequestHandlers {
@@ -98,13 +99,20 @@ export class RequestHandlers {
           body: typeof p.body === "string" ? p.body : undefined,
           base: typeof p.base === "string" ? p.base : undefined,
         });
-      case "launchAntigravity": {
-        const adapter = this.deps.adapters.get("antigravity");
-        if (!adapter || !isLaunchable(adapter)) {
-          return { ok: false, detail: "antigravity adapter unavailable" };
-        }
-        return adapter.launch();
+      case "antigravityStatus":
+        return this.deps.antigravity.statusInfo();
+      case "installAntigravity": {
+        const status = await this.deps.antigravity.install();
+        await this.deps.orchestrator.refreshConfig();
+        return status;
       }
+      case "antigravitySignIn":
+        return this.deps.antigravity.signIn(() => undefined);
+      case "antigravitySignInComplete":
+        return { ok: await this.deps.antigravity.completeSignIn(str(p.callbackUrl)) };
+      case "antigravitySignInCancel":
+        this.deps.antigravity.cancelSignIn();
+        return { ok: true };
       case "mcpCallTool": {
         const result = await this.deps.mcp.callTool(str(p.server), str(p.tool), rec(p.args));
         return { ok: true, result };

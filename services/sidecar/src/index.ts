@@ -3,7 +3,7 @@ import { ReadModel } from "./event/ReadModel.js";
 import { Broadcaster } from "./Broadcaster.js";
 import { AdapterManager } from "./adapters/AdapterManager.js";
 import { OpenCodeAdapter } from "./adapters/OpenCodeAdapter.js";
-import { AntigravityAdapter } from "./adapters/AntigravityAdapter.js";
+import { AntigravityHarness } from "./adapters/AntigravityHarness.js";
 import { McpManager } from "./mcp/McpManager.js";
 import { SkillsLoader } from "./skills/SkillsLoader.js";
 import { ConfigService } from "./config/ConfigService.js";
@@ -42,8 +42,9 @@ async function main(): Promise<void> {
   if (replayed.length > 0) log.info(`replayed ${replayed.length} events from the journal`);
 
   const adapters = new AdapterManager();
+  const antigravity = new AntigravityHarness();
   adapters.register(new OpenCodeAdapter(), { fallback: true });
-  adapters.register(new AntigravityAdapter());
+  adapters.register(antigravity);
 
   const settings = new SettingsStore(userConfigPath);
   const mcp = new McpManager(undefined, settings);
@@ -68,10 +69,17 @@ async function main(): Promise<void> {
     git: new GitService(workspace),
     adapters,
     mcp,
+    antigravity,
   });
 
   await orchestrator.init();
   const server = await startServer(orchestrator, handlers, bus, preferredPort);
+
+  mcp.setBuiltin("orchestrator", {
+    type: "remote",
+    url: `http://127.0.0.1:${server.port}/mcp`,
+    enabled: true,
+  });
 
   process.stdout.write(`ORCHESTRATOR_PORT=${server.port}\n`);
   process.stdout.write(`ORCHESTRATOR_WS=ws://127.0.0.1:${server.port}\n`);

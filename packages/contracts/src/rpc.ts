@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { AppConfigSchema, ModelRefSchema } from "./config.js";
+import { AttachmentSchema } from "./attachments.js";
+import { AppConfigSchema, AntigravityStatusSchema, ModelRefSchema } from "./config.js";
 import { DomainEventSchema } from "./events.js";
 import { ReadModelSchema } from "./readmodel.js";
 import {
@@ -16,6 +17,7 @@ export const CommandSchema = z.discriminatedUnion("kind", [
     prompt: z.string().min(1),
     harness: z.string(),
     model: z.string(),
+    attachments: z.array(AttachmentSchema).optional(),
   }),
   z.object({ kind: z.literal("StopAgent"), threadId: z.string() }),
   z.object({ kind: z.literal("RetryThread"), threadId: z.string(), model: z.string().optional() }),
@@ -23,6 +25,7 @@ export const CommandSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("DiscardThread"), threadId: z.string() }),
   z.object({ kind: z.literal("MergeThread"), threadId: z.string() }),
   z.object({ kind: z.literal("ClearFinished") }),
+  z.object({ kind: z.literal("ClearAll") }),
   z.object({ kind: z.literal("SetModel"), model: ModelRefSchema }),
   z.object({
     kind: z.literal("SetEnabled"),
@@ -62,7 +65,11 @@ export const METHOD_NAMES = [
   "createCheckpoint",
   "restoreCheckpoint",
   "landThread",
-  "launchAntigravity",
+  "antigravityStatus",
+  "installAntigravity",
+  "antigravitySignIn",
+  "antigravitySignInComplete",
+  "antigravitySignInCancel",
   "mcpCallTool",
 ] as const;
 
@@ -120,7 +127,11 @@ export interface MethodMap {
     params: { threadId: string; title?: string; body?: string; base?: string };
     result: { ok: boolean; output: string };
   };
-  launchAntigravity: { params: undefined; result: { ok: boolean; detail: string } };
+  antigravityStatus: { params: undefined; result: z.infer<typeof AntigravityStatusSchema> };
+  installAntigravity: { params: undefined; result: z.infer<typeof AntigravityStatusSchema> };
+  antigravitySignIn: { params: undefined; result: { url: string } };
+  antigravitySignInComplete: { params: { callbackUrl: string }; result: { ok: boolean } };
+  antigravitySignInCancel: { params: undefined; result: { ok: true } };
   mcpCallTool: {
     params: { server: string; tool: string; args: Record<string, unknown> };
     result: { ok: boolean; result: string };

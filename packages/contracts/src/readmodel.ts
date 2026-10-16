@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { AgentStatusSchema, MessageRoleSchema } from "./events.js";
+import { AgentStatusSchema, MessageRoleSchema, UsageSchema } from "./events.js";
+import { AttachmentMetaSchema } from "./attachments.js";
 import { AppConfigSchema } from "./config.js";
 
 export const ToolViewSchema = z.object({
@@ -8,6 +9,8 @@ export const ToolViewSchema = z.object({
   args: z.string(),
   ok: z.boolean().optional(),
   result: z.string().optional(),
+  startedAt: z.number().int().optional(),
+  endedAt: z.number().int().optional(),
 });
 export type ToolView = z.infer<typeof ToolViewSchema>;
 
@@ -15,6 +18,7 @@ export const MessageViewSchema = z.object({
   id: z.string(),
   role: MessageRoleSchema,
   text: z.string(),
+  reasoning: z.string().optional(),
   tools: z.array(ToolViewSchema),
 });
 export type MessageView = z.infer<typeof MessageViewSchema>;
@@ -32,6 +36,8 @@ export const ThreadViewSchema = z.object({
   branch: z.string().optional(),
   worktree: z.string().optional(),
   parentId: z.string().optional(),
+  attachments: z.array(AttachmentMetaSchema).optional(),
+  usage: UsageSchema.optional(),
 });
 export type ThreadView = z.infer<typeof ThreadViewSchema>;
 

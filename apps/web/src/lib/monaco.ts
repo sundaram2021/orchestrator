@@ -41,12 +41,12 @@ monaco.editor.defineTheme("orchestrator-dark", {
     { token: "number", foreground: "f78c6c" },
   ],
   colors: {
-    "editor.background": "#0b0d10",
-    "editor.foreground": "#d4d8de",
-    "editorLineNumber.foreground": "#3a404a",
-    "editorLineNumber.activeForeground": "#7c838e",
-    "editor.selectionBackground": "#264f78",
-    "editorCursor.foreground": "#5b8def",
+    "editor.background": "#0e0e0f",
+    "editor.foreground": "#d4d6dc",
+    "editorLineNumber.foreground": "#3a3a42",
+    "editorLineNumber.activeForeground": "#7c7c88",
+    "editor.selectionBackground": "#26406f",
+    "editorCursor.foreground": "#3d6ef5",
   },
 });
 

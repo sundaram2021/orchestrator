@@ -60,3 +60,15 @@ test("skips servers without a transport that are already disabled", () => {
   const bridge = buildBridgeConfig([server("broken", false, null)]);
   assert.deepEqual(bridge.mcp, {});
 });
+
+test("merges builtin servers and lets them win over discovered ones", () => {
+  const bridge = buildBridgeConfig(
+    [server("orchestrator", false, { kind: "http", url: "https://stale.example/mcp", headers: {} })],
+    { orchestrator: { type: "remote", url: "http://127.0.0.1:4123/mcp", enabled: true } },
+  );
+  assert.deepEqual(bridge.mcp.orchestrator, {
+    type: "remote",
+    url: "http://127.0.0.1:4123/mcp",
+    enabled: true,
+  });
+});

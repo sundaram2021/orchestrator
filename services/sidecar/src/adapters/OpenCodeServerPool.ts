@@ -3,9 +3,16 @@ import type { ServerEvent, ServerModel } from "./OpenCodeServer.js";
 export interface ServerHandle {
   url(cwd: string): Promise<string>;
   createSession(model: ServerModel, title?: string): Promise<string>;
-  sendMessage(sessionID: string, model: ServerModel, text: string, system?: string): Promise<void>;
+  sendMessage(
+    sessionID: string,
+    model: ServerModel,
+    text: string,
+    system?: string,
+    attachments?: { name: string; mime: string; data: string }[],
+  ): Promise<void>;
   abort(sessionID: string): Promise<void>;
   subscribe(listener: (event: ServerEvent) => void): () => void;
+  providerLimits(): Promise<Map<string, number>>;
   dispose(): Promise<void>;
 }
 

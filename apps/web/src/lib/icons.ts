@@ -1,3 +1,15 @@
+import type { Component } from "svelte";
+import {
+  FileCode,
+  FileText,
+  FileJson,
+  FileCog,
+  FileImage,
+  FileTerminal,
+  FileType,
+  File as FileIcon,
+} from "@lucide/svelte";
+
 const map: Record<string, string> = {
   ts: "TS",
   tsx: "TS",
@@ -25,6 +37,19 @@ const map: Record<string, string> = {
 export const fileIcon = (name: string): string => {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   return map[ext] ?? "··";
+};
+
+export const fileGlyph = (name: string): Component => {
+  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  if (["ts", "tsx", "js", "jsx", "mjs", "cjs", "svelte", "vue", "rs", "go", "py", "rb", "java", "c", "cpp", "h", "cs", "php", "css", "scss", "html", "sh", "sql"].includes(ext))
+    return FileCode;
+  if (["json", "jsonc", "yml", "yaml", "toml", "lock"].includes(ext)) return FileJson;
+  if (["md", "markdown"].includes(ext)) return FileText;
+  if (["png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "bmp"].includes(ext)) return FileImage;
+  if (["sh", "bash", "zsh", "bat", "ps1", "cmd"].includes(ext)) return FileTerminal;
+  if (["conf", "ini", "env", "cfg"].includes(ext)) return FileCog;
+  if (["txt", "log"].includes(ext)) return FileType;
+  return FileIcon;
 };
 
 export const languageOf = (path: string): string => {

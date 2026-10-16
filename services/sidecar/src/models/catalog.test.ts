@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseOpenCodeModels, buildHarnessModels } from "./catalog.js";
+import { parseOpenCodeModels, buildOpenCodeModels } from "./catalog.js";
 
 test("parses provider/model lines and de-duplicates", () => {
   const stdout = [
@@ -20,26 +20,11 @@ test("parses provider/model lines and de-duplicates", () => {
   assert.equal(models[0]?.short, "deepseek-v4.1-flash-free");
 });
 
-test("splits opencode and antigravity models and expands variants", () => {
+test("keeps only opencode-provider models for the OpenCode harness", () => {
   const catalog = parseOpenCodeModels(
-    ["opencode/a", "google/antigravity-gemini-3-pro"].join("\n"),
+    ["opencode/a", "google/antigravity-gemini-3-pro", "anthropic/claude-x"].join("\n"),
   );
-  const { opencode, antigravity } = buildHarnessModels(catalog, {
-    provider: {
-      google: {
-        models: {
-          "antigravity-gemini-3-pro": {
-            name: "Gemini 3 Pro",
-            variants: { low: {}, high: {} },
-          },
-        },
-      },
-    },
-  });
-  assert.deepEqual(opencode.map((m) => m.id), ["opencode/a"]);
-  assert.deepEqual(antigravity.map((m) => m.id), [
-    "google/antigravity-gemini-3-pro#low",
-    "google/antigravity-gemini-3-pro#high",
-  ]);
-  assert.equal(antigravity[0]?.name, "Gemini 3 Pro (low)");
+  const models = buildOpenCodeModels(catalog);
+  assert.deepEqual(models.map((m) => m.id), ["opencode/a"]);
+  assert.equal(models[0]?.name, "a");
 });

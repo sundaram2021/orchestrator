@@ -1,5 +1,7 @@
 import type {
   AppConfig,
+  Attachment,
+  AttachmentMeta,
   Checkpoint,
   Command,
   DomainEvent,
@@ -8,6 +10,9 @@ import type {
   ReadModel as ReadModelData,
   ThreadView,
 } from "@orchestrator/contracts";
+import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { EventStore } from "./event/EventStore.js";
 import { ReadModel } from "./event/ReadModel.js";
 import type { Broadcaster } from "./Broadcaster.js";
@@ -21,6 +26,15 @@ import { uid, truncate } from "./util/ids.js";
 import { logger } from "./util/logger.js";
 
 const log = logger("orchestrator");
+
+const ORCHESTRATOR_TOOL_NAMES =
+  "orchestrator_capabilities, orchestrator_create_thread, orchestrator_delegate_task, orchestrator_task_status, orchestrator_task_cancel, orchestrator_thread_list, orchestrator_thread_read, orchestrator_thread_wait, orchestrator_thread_interrupt";
+
+const threadContext = (threadId: string): string =>
+  `You are an agent running inside Orchestrator. Your thread id is "${threadId}". ` +
+  `You can orchestrate other agents through the "orchestrator" MCP tools (${ORCHESTRATOR_TOOL_NAMES}). ` +
+  `Use orchestrator_delegate_task to hand off independent work to a child agent and wait for its result; ` +
+  `pass parent_id="${threadId}" so the child is linked to this thread.`;
 
 interface Run {
   threadId: string;
@@ -62,6 +76,10 @@ export class Orchestrator {
     this.emit({ type: "config.changed", config });
   }
 
+  async refreshConfig(): Promise<void> {
+    await this.publishConfig();
+  }
+
   async init(): Promise<void> {
     await this.deps.adapters.startAll();
     const config = await this.deps.config.assemble();
@@ -84,6 +102,56 @@ export class Orchestrator {
 
   snapshot(): ReadModelData {
     return this.deps.readModel.snapshot();
+  }
+
+  capabilities(): {
+    harnesses: { id: string; name: string; models: { id: string; name: string }[] }[];
+    model: ModelRef;
+  } {
+    const config = this.deps.readModel.snapshot().config;
+    return {
+      model: config.model,
+      harnesses: config.harnesses.map((h) => ({
+        id: h.id,
+        name: h.name,
+        models: h.models.map((m) => ({ id: m.id, name: m.name })),
+      })),
+    };
+  }
+
+  async spawnThread(opts: {
+    prompt: string;
+    harness?: string;
+    model?: string;
+    parentId?: string;
+  }): Promise<string> {
+    const config = this.deps.readModel.snapshot().config;
+    const harness = opts.harness?.trim() || config.model.harness;
+    const model = opts.model?.trim() || config.model.id;
+    return this.startThread(opts.prompt, harness, model, opts.parentId);
+  }
+
+  threadView(threadId: string): ThreadView | undefined {
+    return this.findThread(threadId);
+  }
+
+  listThreadViews(): ThreadView[] {
+    return this.deps.readModel.snapshot().threads;
+  }
+
+  async interrupt(threadId: string): Promise<void> {
+    await this.stopAgent(threadId);
+  }
+
+  async awaitThread(threadId: string, timeoutMs = 600_000): Promise<ThreadView | undefined> {
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    for (;;) {
+      const view = this.findThread(threadId);
+      if (!view) return undefined;
+      if (view.status !== "running") return view;
+      if (Date.now() >= deadline) return view;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 
   replay(fromSeq: number): DomainEvent[] {
@@ -163,7 +231,7 @@ export class Orchestrator {
   async handle(command: Command): Promise<{ accepted: true }> {
     switch (command.kind) {
       case "StartThread":
-        void this.startThread(command.prompt, command.harness, command.model);
+        void this.startThread(command.prompt, command.harness, command.model, undefined, command.attachments);
         break;
       case "StopAgent":
         await this.stopAgent(command.threadId);
@@ -182,6 +250,9 @@ export class Orchestrator {
         break;
       case "ClearFinished":
         this.clearFinished();
+        break;
+      case "ClearAll":
+        await this.clearAll();
         break;
       case "SetModel":
         this.deps.config.setModel(command.model as ModelRef);
@@ -206,9 +277,12 @@ export class Orchestrator {
     harness: string,
     model: string,
     parentId?: string,
-  ): Promise<void> {
+    attachments?: Attachment[],
+  ): Promise<string> {
     const threadId = uid("th_");
     const worktree = await this.deps.worktrees.create(threadId).catch(() => null);
+    const saved = attachments?.length ? await this.saveAttachments(threadId, attachments) : [];
+    const meta: AttachmentMeta[] = saved.map((a) => ({ name: a.name, mime: a.mime, size: a.size }));
     this.emit({
       type: "thread.started",
       threadId,
@@ -218,20 +292,31 @@ export class Orchestrator {
       prompt,
       ...(worktree ? { branch: worktree.branch, worktree: worktree.dir } : {}),
       ...(parentId ? { parentId } : {}),
+      ...(meta.length ? { attachments: meta } : {}),
     });
+    void this.runThread(threadId, prompt, harness, model, worktree?.dir ?? this.deps.workspace, saved);
+    return threadId;
+  }
 
+  private async runThread(
+    threadId: string,
+    prompt: string,
+    harness: string,
+    model: string,
+    cwd: string,
+    saved: { name: string; mime: string; data: string; size: number; path: string }[],
+  ): Promise<void> {
     const executor = this.deps.adapters.executorFor(harness);
     if (!executor) {
       this.emit({ type: "agent.error", threadId, message: `No adapter available for ${harness}` });
       return;
     }
 
-    const session = await executor.startSession(worktree?.dir ?? this.deps.workspace);
+    const session = await executor.startSession(cwd);
     const run: Run = { threadId, session, executor, stopped: false };
     this.runs.set(threadId, run);
 
-    const skillPrompt = this.deps.skills.systemPrompt();
-    if (skillPrompt) this.emit({ type: "message.appended", threadId, messageId: uid("m"), role: "system", text: skillPrompt });
+    const system = [threadContext(threadId), this.deps.skills.systemPrompt()].filter(Boolean).join("\n\n");
 
     const invocation = this.deps.skills.matchInvocation(prompt);
     const effectivePrompt = invocation
@@ -251,7 +336,19 @@ export class Orchestrator {
     };
 
     try {
-      const options = skillPrompt ? { system: skillPrompt } : undefined;
+      const options = {
+        system,
+        ...(saved.length
+          ? {
+              attachments: saved.map((a) => ({
+                name: a.name,
+                mime: a.mime,
+                data: a.data,
+                path: a.path,
+              })),
+            }
+          : {}),
+      };
       for await (const evt of executor.sendTurn(session, effectivePrompt, model, options)) {
         if (run.stopped) break;
         switch (evt.kind) {
@@ -262,11 +359,17 @@ export class Orchestrator {
           case "assistant":
             this.emit({ type: "message.delta", threadId, messageId: ensureAssistant(), delta: evt.text });
             break;
+          case "reasoning":
+            this.emit({ type: "message.reasoning", threadId, messageId: ensureAssistant(), delta: evt.text });
+            break;
           case "tool":
             this.emit({ type: "tool.called", threadId, callId: evt.callId, tool: evt.tool, args: evt.args });
             break;
           case "toolResult":
             this.emit({ type: "tool.result", threadId, callId: evt.callId, ok: evt.ok, result: evt.result });
+            break;
+          case "usage":
+            this.emit({ type: "usage.updated", threadId, usage: evt.usage });
             break;
           case "error":
             this.emit({ type: "agent.error", threadId, message: evt.message });
@@ -287,6 +390,23 @@ export class Orchestrator {
     }
   }
 
+  private async saveAttachments(
+    threadId: string,
+    attachments: Attachment[],
+  ): Promise<{ name: string; mime: string; data: string; size: number; path: string }[]> {
+    const dir = join(homedir(), ".orchestrator", "uploads", threadId);
+    await mkdir(dir, { recursive: true });
+    const saved: { name: string; mime: string; data: string; size: number; path: string }[] = [];
+    for (const [index, a] of attachments.entries()) {
+      const bytes = Buffer.from(a.data, "base64");
+      const safe = `${index + 1}-${a.name.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+      const filePath = join(dir, safe);
+      await writeFile(filePath, bytes);
+      saved.push({ name: a.name, mime: a.mime, data: a.data, size: bytes.length, path: filePath });
+    }
+    return saved;
+  }
+
   private async stopAgent(threadId: string): Promise<void> {
     const run = this.runs.get(threadId);
     if (!run) return;
@@ -301,6 +421,15 @@ export class Orchestrator {
     const threads: ThreadView[] = this.deps.readModel.snapshot().threads;
     for (const thread of threads) {
       if (thread.status !== "running") this.emit({ type: "thread.removed", threadId: thread.id });
+    }
+  }
+
+  private async clearAll(): Promise<void> {
+    for (const threadId of [...this.runs.keys()]) {
+      await this.stopAgent(threadId);
+    }
+    for (const thread of this.deps.readModel.snapshot().threads) {
+      this.emit({ type: "thread.removed", threadId: thread.id });
     }
   }
 

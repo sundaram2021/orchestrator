@@ -64,6 +64,15 @@ export const UpdateSettingsSchema = z.object({
 });
 export type UpdateSettings = z.infer<typeof UpdateSettingsSchema>;
 
+export const AntigravityStatusSchema = z.object({
+  installed: z.boolean(),
+  signedIn: z.boolean(),
+  version: z.string().nullable(),
+  executablePath: z.string().nullable(),
+  detail: z.string(),
+});
+export type AntigravityStatus = z.infer<typeof AntigravityStatusSchema>;
+
 export const AppConfigSchema = z.object({
   workspace: z.string(),
   model: ModelRefSchema,

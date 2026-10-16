@@ -42,12 +42,18 @@ export interface OpenCodeBridgeConfig {
   mcp: Record<string, OpenCodeMcpEntry>;
 }
 
-export function buildBridgeConfig(servers: LoadedMcpServer[]): OpenCodeBridgeConfig {
+export function buildBridgeConfig(
+  servers: LoadedMcpServer[],
+  builtins: Record<string, OpenCodeMcpEntry> = {},
+): OpenCodeBridgeConfig {
   const mcp: Record<string, OpenCodeMcpEntry> = {};
   for (const server of servers) {
     if (server.transport) {
       mcp[server.config.name] = toEntry(server.transport, server.config.enabled);
     }
+  }
+  for (const [name, entry] of Object.entries(builtins)) {
+    mcp[name] = entry;
   }
   return { $schema: "https://opencode.ai/config.json", mcp };
 }
@@ -55,13 +61,22 @@ export function buildBridgeConfig(servers: LoadedMcpServer[]): OpenCodeBridgeCon
 export class OpenCodeMcpBridge {
   private lastJson = "";
   private readonly path: string;
+  private readonly builtins = new Map<string, OpenCodeMcpEntry>();
 
   constructor(path = openCodeBridgeConfig) {
     this.path = path;
   }
 
+  setBuiltin(name: string, entry: OpenCodeMcpEntry): void {
+    this.builtins.set(name, entry);
+  }
+
   sync(servers: LoadedMcpServer[]): string {
-    const payload = JSON.stringify(buildBridgeConfig(servers), null, 2);
+    const payload = JSON.stringify(
+      buildBridgeConfig(servers, Object.fromEntries(this.builtins)),
+      null,
+      2,
+    );
     if (payload === this.lastJson) return this.path;
     try {
       mkdirSync(dirname(this.path), { recursive: true });

@@ -152,17 +152,50 @@ export class OpenCodeServer {
     return result.id;
   }
 
-  async sendMessage(sessionID: string, model: ServerModel, text: string, system?: string): Promise<void> {
+  async sendMessage(
+    sessionID: string,
+    model: ServerModel,
+    text: string,
+    system?: string,
+    attachments?: { name: string; mime: string; data: string }[],
+  ): Promise<void> {
+    const files = (attachments ?? []).map((a) => ({
+      type: "file" as const,
+      mime: a.mime,
+      filename: a.name,
+      url: `data:${a.mime};base64,${a.data}`,
+    }));
     await this.request("POST", `/session/${sessionID}/message`, {
       model: { providerID: model.providerID, modelID: model.modelID },
       ...(model.variant ? { variant: model.variant } : {}),
       ...(system ? { system } : {}),
-      parts: [{ type: "text", text }],
+      parts: [{ type: "text", text }, ...files],
     });
   }
 
   async abort(sessionID: string): Promise<void> {
     await this.request("POST", `/session/${sessionID}/abort`).catch(() => undefined);
+  }
+
+  async providerLimits(): Promise<Map<string, number>> {
+    const limits = new Map<string, number>();
+    try {
+      const data = (await this.request("GET", "/provider")) as {
+        all?: { id?: string; models?: Record<string, { limit?: { context?: number } }> }[];
+      };
+      for (const provider of data.all ?? []) {
+        if (!provider.id || !provider.models) continue;
+        for (const [modelId, model] of Object.entries(provider.models)) {
+          const context = model.limit?.context;
+          if (typeof context === "number" && context > 0) {
+            limits.set(`${provider.id}/${modelId}`, context);
+          }
+        }
+      }
+    } catch {
+      /* provider catalog unavailable — usage will omit context limit */
+    }
+    return limits;
   }
 
   async dispose(): Promise<void> {

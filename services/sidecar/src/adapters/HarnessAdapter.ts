@@ -1,4 +1,4 @@
-import type { HarnessStatus, ModelDescriptor } from "@orchestrator/contracts";
+import type { HarnessStatus, ModelDescriptor, Usage } from "@orchestrator/contracts";
 
 export interface SessionHandle {
   id: string;
@@ -10,13 +10,23 @@ export type ProviderEvent =
   | { kind: "status"; status: HarnessStatus }
   | { kind: "system"; text: string }
   | { kind: "assistant"; text: string; delta: boolean }
+  | { kind: "reasoning"; text: string; delta: boolean }
   | { kind: "tool"; callId: string; tool: string; args: string }
   | { kind: "toolResult"; callId: string; ok: boolean; result: string }
+  | { kind: "usage"; usage: Usage }
   | { kind: "done" }
   | { kind: "error"; message: string };
 
+export interface TurnAttachment {
+  name: string;
+  mime: string;
+  data: string;
+  path?: string;
+}
+
 export interface TurnOptions {
   system?: string;
+  attachments?: TurnAttachment[];
 }
 
 export interface HarnessAdapter {
@@ -30,6 +40,8 @@ export interface HarnessAdapter {
   start(): Promise<void>;
   stop(): Promise<void>;
   models(): Promise<ModelDescriptor[]>;
+  /** Optional: human-readable status detail for the settings UI. */
+  describe?(): string;
   startSession(cwd: string): Promise<SessionHandle>;
   sendTurn(
     session: SessionHandle,
@@ -42,10 +54,3 @@ export interface HarnessAdapter {
   /** Optional: release pooled processes rooted at a workspace dir (called before a worktree is removed). */
   disposeWorkspace?(dir: string): Promise<void>;
 }
-
-export interface LaunchableHarness {
-  launch(): Promise<{ ok: boolean; detail: string }>;
-}
-
-export const isLaunchable = (adapter: unknown): adapter is LaunchableHarness =>
-  typeof (adapter as LaunchableHarness | undefined)?.launch === "function";

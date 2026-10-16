@@ -1,8 +1,21 @@
 import { z } from "zod";
+import { AttachmentMetaSchema } from "./attachments.js";
 import { AppConfigSchema, HarnessStatusSchema, McpStatusSchema } from "./config.js";
 
 export const MessageRoleSchema = z.enum(["user", "assistant", "system"]);
 export type MessageRole = z.infer<typeof MessageRoleSchema>;
+
+export const UsageSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  reasoning: z.number().optional(),
+  cacheRead: z.number().optional(),
+  cacheWrite: z.number().optional(),
+  total: z.number().optional(),
+  cost: z.number().optional(),
+  contextLimit: z.number().optional(),
+});
+export type Usage = z.infer<typeof UsageSchema>;
 
 export const AgentStatusSchema = z.enum(["running", "stopped", "done", "error"]);
 export type AgentStatus = z.infer<typeof AgentStatusSchema>;
@@ -17,6 +30,7 @@ export const ThreadStartedSchema = z.object({
   branch: z.string().optional(),
   worktree: z.string().optional(),
   parentId: z.string().optional(),
+  attachments: z.array(AttachmentMetaSchema).optional(),
 });
 
 export const AgentStatusChangedSchema = z.object({
@@ -35,6 +49,13 @@ export const MessageAppendedSchema = z.object({
 
 export const MessageDeltaSchema = z.object({
   type: z.literal("message.delta"),
+  threadId: z.string(),
+  messageId: z.string(),
+  delta: z.string(),
+});
+
+export const MessageReasoningSchema = z.object({
+  type: z.literal("message.reasoning"),
   threadId: z.string(),
   messageId: z.string(),
   delta: z.string(),
@@ -59,6 +80,12 @@ export const ToolResultSchema = z.object({
 export const TurnCompletedSchema = z.object({
   type: z.literal("turn.completed"),
   threadId: z.string(),
+});
+
+export const UsageUpdatedSchema = z.object({
+  type: z.literal("usage.updated"),
+  threadId: z.string(),
+  usage: UsageSchema,
 });
 
 export const AgentErrorSchema = z.object({
@@ -95,9 +122,11 @@ export const EventBodySchema = z.discriminatedUnion("type", [
   AgentStatusChangedSchema,
   MessageAppendedSchema,
   MessageDeltaSchema,
+  MessageReasoningSchema,
   ToolCalledSchema,
   ToolResultSchema,
   TurnCompletedSchema,
+  UsageUpdatedSchema,
   AgentErrorSchema,
   ThreadRemovedSchema,
   ConfigChangedSchema,

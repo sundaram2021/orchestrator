@@ -1,23 +1,13 @@
-import { readFileSync } from "node:fs";
 import type { AppConfig, HarnessConfig, ModelRef } from "@orchestrator/contracts";
 import type { AdapterManager } from "../adapters/AdapterManager.js";
 import type { McpManager } from "../mcp/McpManager.js";
 import type { SkillsLoader } from "../skills/SkillsLoader.js";
-import { configPaths } from "./paths.js";
 import { SettingsStore } from "./SettingsStore.js";
-import { parseOpenCodeModels, buildHarnessModels, type CatalogModel } from "../models/catalog.js";
+import { parseOpenCodeModels, buildOpenCodeModels, type CatalogModel } from "../models/catalog.js";
 import { runCapture } from "../util/process.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("config");
-
-const readJson = (file: string): Record<string, unknown> => {
-  try {
-    return JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-};
 
 export class ConfigService {
   private catalog: CatalogModel[] = [];
@@ -39,13 +29,11 @@ export class ConfigService {
     this.catalogAt = Date.now();
   }
 
-  private harnessConfigs(): HarnessConfig[] {
+  private async harnessConfigs(): Promise<HarnessConfig[]> {
     const opencode = this.adapters.get("opencode");
     const antigravity = this.adapters.get("antigravity");
-    const { opencode: ocModels, antigravity: agModels } = buildHarnessModels(
-      this.catalog,
-      readJson(configPaths.opencode),
-    );
+    const ocModels = buildOpenCodeModels(this.catalog);
+    const agModels = (await antigravity?.models()) ?? [];
 
     const make = (
       id: string,
@@ -60,7 +48,7 @@ export class ConfigService {
         name,
         color,
         status: adapter?.status ?? "disabled",
-        detail,
+        detail: adapter?.describe?.() ?? detail,
         enabled: this.settings.harnessEnabled(id, true),
         models,
       };
@@ -78,7 +66,7 @@ export class ConfigService {
         "antigravity",
         antigravity?.name ?? "Antigravity",
         antigravity?.color ?? "#c792ea",
-        "Model source · run through OpenCode",
+        "Google Antigravity agent (ACP)",
         agModels,
       ),
     ];
@@ -94,7 +82,7 @@ export class ConfigService {
 
   async assemble(): Promise<AppConfig> {
     await this.loadCatalog();
-    const harnesses = this.harnessConfigs();
+    const harnesses = await this.harnessConfigs();
     const config: AppConfig = {
       workspace: this.workspace,
       model: this.config?.model ?? this.settings.model ?? this.defaultModel(harnesses),

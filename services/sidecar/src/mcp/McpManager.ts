@@ -1,7 +1,7 @@
 import type { McpServerConfig, McpStatus } from "@orchestrator/contracts";
 import { loadMcpServers, type LoadedMcpServer } from "./mcpConfig.js";
 import { connectHttp, connectStdio, type McpConnection } from "./McpClient.js";
-import { OpenCodeMcpBridge } from "./OpenCodeMcpBridge.js";
+import { OpenCodeMcpBridge, type OpenCodeMcpEntry } from "./OpenCodeMcpBridge.js";
 import { SettingsStore } from "../config/SettingsStore.js";
 import { logger } from "../util/logger.js";
 
@@ -32,6 +32,11 @@ export class McpManager {
 
   private syncBridge(): void {
     this.bridge.sync(this.servers);
+  }
+
+  setBuiltin(name: string, entry: OpenCodeMcpEntry): void {
+    this.bridge.setBuiltin(name, entry);
+    this.syncBridge();
   }
 
   list(): McpServerConfig[] {

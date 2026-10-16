@@ -21,6 +21,7 @@ const makeFake = (created: FakeServer[]): ServerHandle => {
     sendMessage: async () => undefined,
     abort: async () => undefined,
     subscribe: () => () => undefined,
+    providerLimits: async () => new Map<string, number>(),
     dispose: async () => {
       server.disposeCount++;
     },

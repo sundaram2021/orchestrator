@@ -1,14 +1,14 @@
 import type { ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import type { HarnessStatus, ModelDescriptor } from "@orchestrator/contracts";
+import type { HarnessStatus, ModelDescriptor, Usage } from "@orchestrator/contracts";
 import { killTree, runCapture, spawnStream } from "../util/process.js";
 import { uid } from "../util/ids.js";
 import { logger } from "../util/logger.js";
 import { parseOpenCodeModels } from "../models/catalog.js";
 import { openCodeBridgeConfig } from "../config/paths.js";
 import { OpenCodeServer, type ServerEvent, type ServerModel } from "./OpenCodeServer.js";
-import { OpenCodeServerPool } from "./OpenCodeServerPool.js";
-import type { HarnessAdapter, ProviderEvent, SessionHandle, TurnOptions } from "./HarnessAdapter.js";
+import { OpenCodeServerPool, type ServerHandle } from "./OpenCodeServerPool.js";
+import type { HarnessAdapter, ProviderEvent, SessionHandle, TurnAttachment, TurnOptions } from "./HarnessAdapter.js";
 
 const log = logger("adapter:opencode");
 
@@ -45,8 +45,60 @@ interface PartShape {
 
 interface MessageInfoShape {
   role?: string;
-  error?: { message?: string };
+  error?: ProviderErrorShape;
+  modelID?: string;
+  providerID?: string;
+  cost?: number;
+  tokens?: {
+    input?: number;
+    output?: number;
+    reasoning?: number;
+    total?: number;
+    cache?: { read?: number; write?: number };
+  };
 }
+
+interface ProviderErrorShape {
+  message?: string;
+  data?: { message?: string };
+}
+
+const errorMessage = (err: unknown, fallback: string): string => {
+  if (!err || typeof err !== "object") return fallback;
+  const shaped = err as ProviderErrorShape;
+  if (typeof shaped.message === "string" && shaped.message) return shaped.message;
+  if (typeof shaped.data?.message === "string" && shaped.data.message) return shaped.data.message;
+  return fallback;
+};
+
+const toUsage = (info: MessageInfoShape, limits: Map<string, number>): Usage | null => {
+  const tokens = info.tokens;
+  if (!tokens || typeof tokens.input !== "number") return null;
+  const input = tokens.input;
+  const output = typeof tokens.output === "number" ? tokens.output : 0;
+  const reasoning = typeof tokens.reasoning === "number" ? tokens.reasoning : undefined;
+  const cacheRead = typeof tokens.cache?.read === "number" ? tokens.cache.read : undefined;
+  const cacheWrite = typeof tokens.cache?.write === "number" ? tokens.cache.write : undefined;
+  const hasTokens =
+    input > 0 || output > 0 || (reasoning ?? 0) > 0 || (cacheRead ?? 0) > 0 || (cacheWrite ?? 0) > 0;
+  if (!hasTokens) return null;
+  const total =
+    typeof tokens.total === "number"
+      ? tokens.total
+      : input + output + (reasoning ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0);
+  const key = info.providerID && info.modelID ? `${info.providerID}/${info.modelID}` : "";
+  const contextLimit = limits.get(key);
+  return {
+    input,
+    output,
+    total,
+    ...(reasoning !== undefined ? { reasoning } : {}),
+    ...(cacheRead !== undefined ? { cacheRead } : {}),
+    ...(cacheWrite !== undefined ? { cacheWrite } : {}),
+    ...(typeof info.cost === "number" ? { cost: info.cost } : {}),
+    ...(contextLimit ? { contextLimit } : {}),
+  };
+};
 
 export function parseRunLine(line: string): ProviderEvent[] {
   const trimmed = line.trim();
@@ -68,6 +120,10 @@ export function parseRunLine(line: string): ProviderEvent[] {
 
   if (type === "text" && typeof part.text === "string") {
     return [{ kind: "assistant", text: part.text, delta: true }];
+  }
+
+  if (type === "reasoning" && typeof part.text === "string") {
+    return [{ kind: "reasoning", text: part.text, delta: true }];
   }
 
   if (type === "tool") {
@@ -103,6 +159,18 @@ export class OpenCodeAdapter implements HarnessAdapter {
   private readonly externalIds = new Map<string, string>();
   private poolInstance: OpenCodeServerPool | null = null;
   private liveServer = true;
+  private readonly limitCache = new Map<string, number>();
+
+  private async limitsFor(server: ServerHandle): Promise<Map<string, number>> {
+    if (this.limitCache.size) return this.limitCache;
+    try {
+      const limits = await server.providerLimits();
+      for (const [key, value] of limits) this.limitCache.set(key, value);
+    } catch {
+      /* ignore — context limit stays unknown */
+    }
+    return this.limitCache;
+  }
 
   private get pool(): OpenCodeServerPool {
     if (!this.poolInstance) {
@@ -188,6 +256,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
     prompt: string,
     model: string,
     system?: string,
+    attachments?: TurnAttachment[],
   ): AsyncIterable<ProviderEvent> {
     const children = this.children;
     const externalIds = this.externalIds;
@@ -197,6 +266,9 @@ export class OpenCodeAdapter implements HarnessAdapter {
     async function* run(): AsyncGenerator<ProviderEvent> {
       const args = ["run", fullPrompt, "--format", "json", "-m", modelRef.model];
       if (modelRef.variant) args.push("--variant", modelRef.variant);
+      for (const a of attachments ?? []) {
+        if (a.path) args.push("-f", a.path);
+      }
       const child = spawnStream("opencode", args, { cwd: session.cwd, env: harnessEnv() });
       children.set(session.id, child);
 
@@ -269,6 +341,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
     prompt: string,
     model: string,
     system?: string,
+    attachments?: TurnAttachment[],
   ): AsyncIterable<ProviderEvent> {
     const self = this;
     const modelRef = toServerModel(model);
@@ -280,6 +353,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
       let notify: (() => void) | null = null;
       let finished = false;
       const streamedParts = new Set<string>();
+      const partTypes = new Map<string, string>();
       const toolState = new Map<string, "called" | "done">();
       let unsub: (() => void) | null = null;
 
@@ -291,6 +365,8 @@ export class OpenCodeAdapter implements HarnessAdapter {
           self.externalIds.set(session.id, serverID);
         }
 
+        const limits = await self.limitsFor(server);
+
         unsub = server.subscribe((event) => {
           const sid = event.properties?.sessionID;
           if (typeof sid === "string" && sid !== serverID) return;
@@ -298,7 +374,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
           notify?.();
         });
 
-        const post = server.sendMessage(serverID, modelRef, prompt, system).catch((err: unknown) => {
+        const post = server.sendMessage(serverID, modelRef, prompt, system, attachments).catch((err: unknown) => {
           queue.push({ type: "__error", properties: { message: err instanceof Error ? err.message : String(err) } });
           notify?.();
         });
@@ -323,14 +399,17 @@ export class OpenCodeAdapter implements HarnessAdapter {
               const delta = props.delta;
               const partID = props.partID;
               if (props.field === "text" && typeof delta === "string" && delta) {
+                const kind = typeof partID === "string" ? partTypes.get(partID) : undefined;
                 if (typeof partID === "string") streamedParts.add(partID);
-                yield { kind: "assistant", text: delta, delta: true };
+                if (kind === "reasoning") yield { kind: "reasoning", text: delta, delta: true };
+                else yield { kind: "assistant", text: delta, delta: true };
               }
               break;
             }
             case "message.part.updated": {
               const part = props.part as PartShape | undefined;
               if (!part) break;
+              if (part.id && part.type) partTypes.set(part.id, part.type);
               if (
                 part.type === "text" &&
                 typeof part.text === "string" &&
@@ -340,6 +419,15 @@ export class OpenCodeAdapter implements HarnessAdapter {
               ) {
                 streamedParts.add(part.id);
                 if (part.text) yield { kind: "assistant", text: part.text, delta: true };
+              } else if (
+                part.type === "reasoning" &&
+                typeof part.text === "string" &&
+                part.id &&
+                part.time?.end &&
+                !streamedParts.has(part.id)
+              ) {
+                streamedParts.add(part.id);
+                if (part.text) yield { kind: "reasoning", text: part.text, delta: true };
               } else if (part.type === "tool" && part.callID) {
                 const callId = part.callID;
                 const state = part.state ?? {};
@@ -366,8 +454,12 @@ export class OpenCodeAdapter implements HarnessAdapter {
             }
             case "message.updated": {
               const info = props.info as MessageInfoShape | undefined;
-              if (info?.role === "assistant" && info.error) {
-                yield { kind: "error", message: info.error.message ?? "opencode error" };
+              if (info?.role === "assistant") {
+                if (info.error) {
+                  yield { kind: "error", message: errorMessage(info.error, "opencode error") };
+                }
+                const usage = toUsage(info, limits);
+                if (usage) yield { kind: "usage", usage };
               }
               break;
             }
@@ -375,8 +467,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
               finished = true;
               break;
             case "session.error": {
-              const err = props.error as { message?: string } | undefined;
-              yield { kind: "error", message: err?.message ?? "opencode session error" };
+              yield { kind: "error", message: errorMessage(props.error, "opencode session error") };
               finished = true;
               break;
             }
@@ -402,7 +493,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
     options?: TurnOptions,
   ): AsyncIterable<ProviderEvent> {
     if (!this.available) return this.simulate(model);
-    if (!this.liveServer) return this.runTurn(session, prompt, model, options?.system);
+    if (!this.liveServer) return this.runTurn(session, prompt, model, options?.system, options?.attachments);
 
     const self = this;
     async function* guarded(): AsyncGenerator<ProviderEvent> {
@@ -412,10 +503,10 @@ export class OpenCodeAdapter implements HarnessAdapter {
         self.liveServer = false;
         log.warn("opencode serve unavailable, falling back to run mode", err instanceof Error ? err.message : err);
         await self.pool.drop(session.cwd).catch(() => undefined);
-        yield* self.runTurn(session, prompt, model, options?.system);
+        yield* self.runTurn(session, prompt, model, options?.system, options?.attachments);
         return;
       }
-      yield* self.serveTurn(session, prompt, model, options?.system);
+      yield* self.serveTurn(session, prompt, model, options?.system, options?.attachments);
     }
     return guarded();
   }

@@ -66,3 +66,21 @@ test("captures worktree, prompt and parent on thread.started", () => {
   assert.equal(thread?.prompt, "fix the bug");
   assert.equal(thread?.parentId, "t1");
 });
+
+test("projects token/context usage onto the thread", () => {
+  const rm = new ReadModel(config);
+  rm.apply({ seq: 0, ts: 0, event: { type: "thread.started", threadId: "t1", title: "a", harness: "opencode", model: "m" } });
+  rm.apply({
+    seq: 1,
+    ts: 1,
+    event: {
+      type: "usage.updated",
+      threadId: "t1",
+      usage: { input: 1200, output: 340, cacheRead: 100, total: 1640, contextLimit: 200000 },
+    },
+  });
+  const usage = rm.snapshot().threads[0]?.usage;
+  assert.equal(usage?.input, 1200);
+  assert.equal(usage?.output, 340);
+  assert.equal(usage?.contextLimit, 200000);
+});
