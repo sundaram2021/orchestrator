@@ -186,5 +186,3 @@ export const renderMarkdown = (source: string): string => {
   flush();
   return out.join("\n");
 };
-
-export { looksLikePath };

@@ -5,10 +5,7 @@ import type { GitService } from "../git/GitService.js";
 import type { AdapterManager } from "../adapters/AdapterManager.js";
 import type { AntigravityHarness } from "../adapters/AntigravityHarness.js";
 import type { McpManager } from "../mcp/McpManager.js";
-
-const str = (value: unknown, fallback = ""): string => (typeof value === "string" ? value : fallback);
-const rec = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+import { asRecord, asString } from "../util/coerce.js";
 
 export interface HandlerDeps {
   orchestrator: Orchestrator;
@@ -23,7 +20,7 @@ export class RequestHandlers {
   constructor(private readonly deps: HandlerDeps) {}
 
   async handle(method: MethodName, params: unknown): Promise<unknown> {
-    const p = rec(params);
+    const p = asRecord(params);
     switch (method) {
       case "ping":
         return { pong: true, ts: Date.now() };
@@ -40,23 +37,23 @@ export class RequestHandlers {
       }
       case "listTree":
         return this.deps.files.listTree(
-          str(p.path),
+          asString(p.path),
           typeof p.depth === "number" ? p.depth : undefined,
         );
       case "readFile":
-        return this.deps.files.readFile(str(p.path));
+        return this.deps.files.readFile(asString(p.path));
       case "writeFile":
-        await this.deps.files.writeFile(str(p.path), str(p.content));
+        await this.deps.files.writeFile(asString(p.path), asString(p.content));
         return { ok: true };
       case "createPath": {
-        await this.deps.files.createPath(str(p.path), p.type === "dir" ? "dir" : "file");
+        await this.deps.files.createPath(asString(p.path), p.type === "dir" ? "dir" : "file");
         return { ok: true };
       }
       case "renamePath":
-        await this.deps.files.rename(str(p.from), str(p.to));
+        await this.deps.files.rename(asString(p.from), asString(p.to));
         return { ok: true };
       case "deletePath":
-        await this.deps.files.remove(str(p.path));
+        await this.deps.files.remove(asString(p.path));
         return { ok: true };
       case "gitStatus":
         return this.deps.git.status();
@@ -71,30 +68,30 @@ export class RequestHandlers {
         await this.deps.git.stage(typeof p.path === "string" ? p.path : undefined);
         return { ok: true };
       case "gitCommit":
-        return this.deps.git.commit(str(p.message));
+        return this.deps.git.commit(asString(p.message));
       case "gitPush":
         return this.deps.git.push();
       case "gitBranches":
         return this.deps.git.branches();
       case "gitCheckout":
-        return this.deps.git.checkout(str(p.branch), p.force === true);
+        return this.deps.git.checkout(asString(p.branch), p.force === true);
       case "gitCreatePr":
         return this.deps.git.createPullRequest({
-          title: str(p.title),
+          title: asString(p.title),
           body: typeof p.body === "string" ? p.body : undefined,
           base: typeof p.base === "string" ? p.base : undefined,
         });
       case "listCheckpoints":
-        return this.deps.orchestrator.listCheckpoints(str(p.threadId));
+        return this.deps.orchestrator.listCheckpoints(asString(p.threadId));
       case "createCheckpoint":
         return this.deps.orchestrator.createCheckpoint(
-          str(p.threadId),
+          asString(p.threadId),
           typeof p.label === "string" ? p.label : undefined,
         );
       case "restoreCheckpoint":
-        return this.deps.orchestrator.restoreCheckpoint(str(p.threadId), str(p.sha));
+        return this.deps.orchestrator.restoreCheckpoint(asString(p.threadId), asString(p.sha));
       case "landThread":
-        return this.deps.orchestrator.landThread(str(p.threadId), {
+        return this.deps.orchestrator.landThread(asString(p.threadId), {
           title: typeof p.title === "string" ? p.title : undefined,
           body: typeof p.body === "string" ? p.body : undefined,
           base: typeof p.base === "string" ? p.base : undefined,
@@ -109,12 +106,12 @@ export class RequestHandlers {
       case "antigravitySignIn":
         return this.deps.antigravity.signIn(() => undefined);
       case "antigravitySignInComplete":
-        return { ok: await this.deps.antigravity.completeSignIn(str(p.callbackUrl)) };
+        return { ok: await this.deps.antigravity.completeSignIn(asString(p.callbackUrl)) };
       case "antigravitySignInCancel":
         this.deps.antigravity.cancelSignIn();
         return { ok: true };
       case "mcpCallTool": {
-        const result = await this.deps.mcp.callTool(str(p.server), str(p.tool), rec(p.args));
+        const result = await this.deps.mcp.callTool(asString(p.server), asString(p.tool), asRecord(p.args));
         return { ok: true, result };
       }
     }

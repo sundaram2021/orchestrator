@@ -15,7 +15,7 @@ import {
   BookOpen,
 } from "@lucide/svelte";
 
-export type ToolCategory =
+type ToolCategory =
   | "run"
   | "read"
   | "write"
@@ -63,7 +63,6 @@ const ICONS: Record<ToolCategory, Component> = {
   other: Wrench,
 };
 
-export const categoryIcon = (cat: ToolCategory): Component => ICONS[cat];
 export const toolIcon = (name: string): Component => ICONS[toolCategory(name)];
 
 const ACTIONS: Record<ToolCategory, string> = {
@@ -111,7 +110,7 @@ export const toolLabel = (name: string): string => pretty(name);
 const str = (value: unknown): string | null => (typeof value === "string" && value ? value : null);
 
 /** Trim absolute/worktree paths down to just the file name for compact display. */
-export const shortPath = (value: string): string => {
+const shortPath = (value: string): string => {
   const trimmed = value.trim();
   const stripped = trimmed.replace(/^.*?worktrees[\\/][^\\/]+[\\/]/i, "");
   const candidate = stripped !== trimmed ? stripped : trimmed;
@@ -154,8 +153,6 @@ export const toolSummary = (name: string, args: string): string => {
   return typeof first === "string" ? first.slice(0, 110) : "";
 };
 
-export const toolIsEdit = (name: string): boolean => toolCategory(name) === "write";
-
 /** Match an OpenCode tool name against a configured MCP server (namespacing varies). */
 export const matchMcpServer = (toolName: string, servers: McpServerConfig[]): string | null => {
   const n = toolName.toLowerCase();
@@ -184,7 +181,7 @@ export const mcpLeaf = (toolName: string, server: string): string =>
     .replace(new RegExp(`^${server}[_./-]*`, "i"), "")
     .replace(/^mcp__?/, "") || toolName;
 
-export type ToolRecord = { title: string; snippet?: string; url?: string; meta?: string };
+type ToolRecord = { title: string; snippet?: string; url?: string; meta?: string };
 
 export type ToolResultView =
   | { kind: "empty" }

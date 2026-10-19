@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { errMessage } from "../util/coerce.js";
+import { createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
@@ -27,9 +28,6 @@ export interface InstallProgress {
 export interface InstallState {
   installed: boolean;
   version: string | null;
-  executablePath: string | null;
-  managedRoot: string;
-  release: { version: string; archiveBytes: number } | null;
 }
 
 const RELEASE_RECORD = "active.json";
@@ -83,14 +81,10 @@ export function resolveRuntime(binaryPath?: string): AntigravityRuntime | null {
 }
 
 export function installState(): InstallState {
-  const asset = resolveAntigravityReleaseAsset();
   const runtime = resolveRuntime();
   return {
     installed: runtime !== null && runtime.source === "managed",
     version: runtime?.version ?? null,
-    executablePath: runtime?.executablePath ?? null,
-    managedRoot: antigravityManagedRoot(),
-    release: asset ? { version: asset.version, archiveBytes: asset.archiveBytes } : null,
   };
 }
 
@@ -191,43 +185,10 @@ export async function installRuntime(
       phase: "error",
       downloadedBytes: 0,
       totalBytes: asset.archiveBytes,
-      detail: err instanceof Error ? err.message : String(err),
+      detail: errMessage(err),
     });
     throw err;
   } finally {
     rmSync(archivePath, { force: true });
-  }
-}
-
-export function removeRuntime(): void {
-  const root = antigravityManagedRoot();
-  if (!existsSync(root)) return;
-  rmSync(path.join(root, "versions"), { recursive: true, force: true });
-  rmSync(activeRecordPath(), { force: true });
-  log.info("antigravity runtime removed");
-}
-
-export function installedRecord(): { version: string; sha256: string } | null {
-  try {
-    const raw = readFileSync(activeRecordPath(), "utf8");
-    const parsed = JSON.parse(raw) as { version?: string; sha256?: string };
-    if (typeof parsed.version === "string" && typeof parsed.sha256 === "string") {
-      return { version: parsed.version, sha256: parsed.sha256 };
-    }
-  } catch {
-    /* no record */
-  }
-  return null;
-}
-
-export function runtimeDiskUsage(): number {
-  const asset = resolveAntigravityReleaseAsset();
-  if (!asset) return 0;
-  const dir = releaseDir(asset);
-  if (!existsSync(dir)) return 0;
-  try {
-    return statSync(dir).size;
-  } catch {
-    return 0;
   }
 }

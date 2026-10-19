@@ -2,8 +2,6 @@ import type { GitBranches, GitFile, GitStatus } from "@orchestrator/contracts";
 import { runCapture } from "../util/process.js";
 import { createPullRequest } from "./gh.js";
 
-export type { GitStatus };
-
 export class GitService {
   constructor(private readonly cwd: string) {}
 

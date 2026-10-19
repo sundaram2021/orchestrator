@@ -1,4 +1,5 @@
 import type { ChildProcess } from "node:child_process";
+import { errMessage } from "../util/coerce.js";
 import { existsSync } from "node:fs";
 import type { HarnessStatus, ModelDescriptor, Usage } from "@orchestrator/contracts";
 import { killTree, runCapture, spawnStream } from "../util/process.js";
@@ -119,11 +120,11 @@ export function parseRunLine(line: string): ProviderEvent[] {
   }
 
   if (type === "text" && typeof part.text === "string") {
-    return [{ kind: "assistant", text: part.text, delta: true }];
+    return [{ kind: "assistant", text: part.text }];
   }
 
   if (type === "reasoning" && typeof part.text === "string") {
-    return [{ kind: "reasoning", text: part.text, delta: true }];
+    return [{ kind: "reasoning", text: part.text }];
   }
 
   if (type === "tool") {
@@ -156,7 +157,6 @@ export class OpenCodeAdapter implements HarnessAdapter {
   private state: HarnessStatus = "disabled";
   private available = false;
   private readonly children = new Map<string, ChildProcess>();
-  private readonly externalIds = new Map<string, string>();
   private poolInstance: OpenCodeServerPool | null = null;
   private liveServer = true;
   private readonly limitCache = new Map<string, number>();
@@ -210,10 +210,6 @@ export class OpenCodeAdapter implements HarnessAdapter {
     return parseOpenCodeModels(res.stdout).map((m) => ({ id: m.id, name: m.short }));
   }
 
-  getExternalId(sessionId: string): string | undefined {
-    return this.externalIds.get(sessionId);
-  }
-
   async startSession(cwd: string): Promise<SessionHandle> {
     return { id: uid("ses_"), cwd };
   }
@@ -237,10 +233,10 @@ export class OpenCodeAdapter implements HarnessAdapter {
       { wait: 400, event: { kind: "system", text: `OpenCode unavailable — running in simulation · ${model}` } },
       {
         wait: 900,
-        event: { kind: "assistant", text: "Reading the request and planning the steps.", delta: true },
+        event: { kind: "assistant", text: "Reading the request and planning the steps." },
       },
       { wait: 700, event: { kind: "tool", callId: uid("call"), tool: "read", args: '{"path":"src/main.ts"}' } },
-      { wait: 500, event: { kind: "assistant", text: "\n\nApplying the change.", delta: true } },
+      { wait: 500, event: { kind: "assistant", text: "\n\nApplying the change." } },
       { wait: 700, event: { kind: "done" } },
     ];
     return (async function* () {
@@ -259,7 +255,6 @@ export class OpenCodeAdapter implements HarnessAdapter {
     attachments?: TurnAttachment[],
   ): AsyncIterable<ProviderEvent> {
     const children = this.children;
-    const externalIds = this.externalIds;
     const modelRef = parseModelRef(model);
     const fullPrompt = system ? `${system}\n\n${prompt}` : prompt;
 
@@ -315,10 +310,6 @@ export class OpenCodeAdapter implements HarnessAdapter {
         }
         const line = lines.shift()!;
         for (const evt of parseRunLine(line)) {
-          if (evt.kind === "assistant" || evt.kind === "system" || evt.kind === "tool") {
-            const m = /"sessionID":"([^"]+)"/.exec(line);
-            if (m) externalIds.set(session.id, m[1]!);
-          }
           if (evt.kind === "error") errored.value = true;
           yield evt;
         }
@@ -362,7 +353,6 @@ export class OpenCodeAdapter implements HarnessAdapter {
         if (!serverID) {
           serverID = await server.createSession(modelRef, session.cwd);
           session.externalId = serverID;
-          self.externalIds.set(session.id, serverID);
         }
 
         const limits = await self.limitsFor(server);
@@ -375,7 +365,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
         });
 
         const post = server.sendMessage(serverID, modelRef, prompt, system, attachments).catch((err: unknown) => {
-          queue.push({ type: "__error", properties: { message: err instanceof Error ? err.message : String(err) } });
+          queue.push({ type: "__error", properties: { message: errMessage(err) } });
           notify?.();
         });
 
@@ -401,8 +391,8 @@ export class OpenCodeAdapter implements HarnessAdapter {
               if (props.field === "text" && typeof delta === "string" && delta) {
                 const kind = typeof partID === "string" ? partTypes.get(partID) : undefined;
                 if (typeof partID === "string") streamedParts.add(partID);
-                if (kind === "reasoning") yield { kind: "reasoning", text: delta, delta: true };
-                else yield { kind: "assistant", text: delta, delta: true };
+                if (kind === "reasoning") yield { kind: "reasoning", text: delta };
+                else yield { kind: "assistant", text: delta };
               }
               break;
             }
@@ -418,7 +408,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
                 !streamedParts.has(part.id)
               ) {
                 streamedParts.add(part.id);
-                if (part.text) yield { kind: "assistant", text: part.text, delta: true };
+                if (part.text) yield { kind: "assistant", text: part.text };
               } else if (
                 part.type === "reasoning" &&
                 typeof part.text === "string" &&
@@ -427,7 +417,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
                 !streamedParts.has(part.id)
               ) {
                 streamedParts.add(part.id);
-                if (part.text) yield { kind: "reasoning", text: part.text, delta: true };
+                if (part.text) yield { kind: "reasoning", text: part.text };
               } else if (part.type === "tool" && part.callID) {
                 const callId = part.callID;
                 const state = part.state ?? {};

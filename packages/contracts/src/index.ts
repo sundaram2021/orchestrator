@@ -4,5 +4,3 @@ export * from "./events.js";
 export * from "./files.js";
 export * from "./readmodel.js";
 export * from "./rpc.js";
-
-export const PROTOCOL_VERSION = "1";

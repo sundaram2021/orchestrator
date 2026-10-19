@@ -7,10 +7,9 @@ export interface SessionHandle {
 }
 
 export type ProviderEvent =
-  | { kind: "status"; status: HarnessStatus }
   | { kind: "system"; text: string }
-  | { kind: "assistant"; text: string; delta: boolean }
-  | { kind: "reasoning"; text: string; delta: boolean }
+  | { kind: "assistant"; text: string }
+  | { kind: "reasoning"; text: string }
   | { kind: "tool"; callId: string; tool: string; args: string }
   | { kind: "toolResult"; callId: string; ok: boolean; result: string }
   | { kind: "usage"; usage: Usage }
@@ -50,6 +49,9 @@ export interface HarnessAdapter {
     options?: TurnOptions,
   ): AsyncIterable<ProviderEvent>;
   interrupt(session: SessionHandle): Promise<void>;
+
+  /** Optional: release per-turn session resources (e.g. a harness subprocess). */
+  disposeSession?(session: SessionHandle): Promise<void>;
 
   /** Optional: release pooled processes rooted at a workspace dir (called before a worktree is removed). */
   disposeWorkspace?(dir: string): Promise<void>;

@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ModelRef } from "@orchestrator/contracts";
+import { asBoolRecord } from "../util/coerce.js";
 
 type Overrides = Record<string, boolean>;
 
@@ -11,15 +12,6 @@ interface SettingsData {
   skills: Overrides;
   updates: { autoUpdate?: boolean; includeMajor?: boolean };
 }
-
-const asOverrides = (value: unknown): Overrides => {
-  if (!value || typeof value !== "object") return {};
-  const out: Overrides = {};
-  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof val === "boolean") out[key] = val;
-  }
-  return out;
-};
 
 export class SettingsStore {
   private data: SettingsData;
@@ -36,9 +28,9 @@ export class SettingsStore {
       const updates = (parsed.updates ?? {}) as Record<string, unknown>;
       return {
         model: parsed.model as ModelRef | undefined,
-        harnesses: asOverrides(parsed.harnesses),
-        mcp: asOverrides(parsed.mcp),
-        skills: asOverrides(parsed.skills),
+        harnesses: asBoolRecord(parsed.harnesses),
+        mcp: asBoolRecord(parsed.mcp),
+        skills: asBoolRecord(parsed.skills),
         updates: {
           autoUpdate: typeof updates.autoUpdate === "boolean" ? updates.autoUpdate : undefined,
           includeMajor: typeof updates.includeMajor === "boolean" ? updates.includeMajor : undefined,

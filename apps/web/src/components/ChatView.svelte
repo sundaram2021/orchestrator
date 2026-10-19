@@ -12,9 +12,11 @@
 
   const thread = $derived(session.activeThread);
   const running = $derived(thread?.status === "running");
-  const sig = $derived(
-    thread ? thread.messages.reduce((n, m) => n + m.text.length + m.tools.length * 4, 0) : 0,
-  );
+  const sig = $derived.by(() => {
+    const messages = thread?.messages ?? [];
+    const last = messages[messages.length - 1];
+    return messages.length * 1_000_000 + (last ? last.text.length + last.tools.length * 4 : 0);
+  });
 
   const suggestions = [
     "Explain this codebase",

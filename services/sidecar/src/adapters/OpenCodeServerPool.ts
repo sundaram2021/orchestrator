@@ -43,12 +43,6 @@ export class OpenCodeServerPool {
     return this.entries.size;
   }
 
-  active(): number {
-    let total = 0;
-    for (const entry of this.entries.values()) total += entry.active;
-    return total;
-  }
-
   private now(): number {
     return this.options.now?.() ?? Date.now();
   }

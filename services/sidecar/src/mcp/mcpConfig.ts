@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { McpServerConfig } from "@orchestrator/contracts";
 import { configPaths } from "../config/paths.js";
+import { asStringRecord } from "../util/coerce.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("mcp:config");
@@ -21,15 +22,6 @@ export interface LoadedMcpServer {
   config: McpServerConfig;
   transport: McpTransportSpec | null;
 }
-
-const asStringRecord = (value: unknown): Record<string, string> => {
-  if (!value || typeof value !== "object") return {};
-  const out: Record<string, string> = {};
-  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof val === "string") out[key] = val;
-  }
-  return out;
-};
 
 interface OpenCodeMcpEntry {
   type?: string;

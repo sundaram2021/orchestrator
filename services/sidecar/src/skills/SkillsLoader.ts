@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import type { SkillConfig } from "@orchestrator/contracts";
 import { skillDirs } from "../config/paths.js";
@@ -36,10 +36,6 @@ export class SkillsLoader {
 
   list(): SkillConfig[] {
     return this.skills;
-  }
-
-  get enabledCount(): number {
-    return this.skills.filter((s) => s.enabled).length;
   }
 
   setEnabled(name: string, enabled: boolean): SkillConfig | undefined {
@@ -111,11 +107,3 @@ export class SkillsLoader {
     return { name, body, prompt: (match[2] ?? "").trim() };
   }
 }
-
-export const isDirectory = (p: string): boolean => {
-  try {
-    return statSync(p).isDirectory();
-  } catch {
-    return false;
-  }
-};

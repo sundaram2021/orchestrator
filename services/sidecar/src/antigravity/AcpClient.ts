@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "cross-spawn";
 import { killTree } from "../util/process.js";
+import { asRecord, errMessage } from "../util/coerce.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("antigravity:acp");
@@ -71,10 +72,6 @@ export class AcpClient {
     });
   }
 
-  get pid(): number | undefined {
-    return this.child.pid;
-  }
-
   private onStdout(chunk: string): void {
     this.stdoutBuffer += chunk;
     let index: number;
@@ -135,7 +132,7 @@ export class AcpClient {
       this.write({
         jsonrpc: "2.0",
         id,
-        error: { code: -32601, message: err instanceof Error ? err.message : String(err) },
+        error: { code: -32601, message: errMessage(err) },
       });
     }
   }
@@ -174,10 +171,6 @@ export class AcpClient {
     }
     killTree(this.child);
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
 function toError(error: unknown): Error {

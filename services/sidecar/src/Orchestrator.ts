@@ -11,6 +11,7 @@ import type {
   ThreadView,
 } from "@orchestrator/contracts";
 import { mkdir, writeFile } from "node:fs/promises";
+import { errMessage } from "./util/coerce.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { EventStore } from "./event/EventStore.js";
@@ -379,14 +380,13 @@ export class Orchestrator {
             this.emit({ type: "turn.completed", threadId });
             this.emit({ type: "agent.status", threadId, status: "done" });
             break;
-          case "status":
-            break;
         }
       }
     } catch (err) {
-      this.emit({ type: "agent.error", threadId, message: err instanceof Error ? err.message : String(err) });
+      this.emit({ type: "agent.error", threadId, message: errMessage(err) });
     } finally {
       this.runs.delete(threadId);
+      await run.executor.disposeSession?.(run.session);
     }
   }
 
@@ -434,7 +434,7 @@ export class Orchestrator {
   }
 
   private findThread(threadId: string): ThreadView | undefined {
-    return this.deps.readModel.snapshot().threads.find((t) => t.id === threadId);
+    return this.deps.readModel.find(threadId);
   }
 
   private retryThread(threadId: string, model?: string): void {

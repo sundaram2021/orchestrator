@@ -13,7 +13,7 @@ import type {
 } from "@orchestrator/contracts";
 import { RpcClient, type ConnState } from "./rpc";
 
-export type EditorView = "code" | "diff" | "markdown";
+type EditorView = "code" | "diff" | "markdown";
 export type SettingsSection = "harnesses" | "mcp" | "skills" | "updates";
 
 const uid = (): string =>
@@ -90,7 +90,6 @@ class Session {
       else this.client.pause();
     });
     this.client.onEvent((event) => this.applyEvent(event));
-    this.client.onEvent(() => this.ensureActive());
     await this.bootstrap();
     this.client.connect();
   }
@@ -221,6 +220,9 @@ class Session {
       }
       case "thread.removed": {
         this.threads = this.threads.filter((t) => t.id !== e.threadId);
+        const checkpoints = { ...this.checkpoints };
+        delete checkpoints[e.threadId];
+        this.checkpoints = checkpoints;
         this.ensureActive();
         break;
       }

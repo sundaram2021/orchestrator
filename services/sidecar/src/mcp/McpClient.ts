@@ -1,9 +1,9 @@
 import spawn from "cross-spawn";
+import { PROTOCOL_VERSION } from "./protocol.js";
 import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import { killTree } from "../util/process.js";
 
-const PROTOCOL_VERSION = "2024-11-05";
 const REQUEST_TIMEOUT_MS = 20000;
 
 type StdioChild = ChildProcessByStdio<Writable, Readable, Readable>;

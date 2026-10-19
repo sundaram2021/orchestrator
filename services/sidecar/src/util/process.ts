@@ -84,29 +84,3 @@ export function spawnStream(
     stdio: ["ignore", "pipe", "pipe"],
   }) as StreamedChild;
 }
-
-export function spawnDetached(
-  command: string,
-  args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env ?? process.env,
-      detached: true,
-      windowsHide: false,
-      stdio: "ignore",
-    });
-    const timer = setTimeout(() => reject(new Error(`timed out launching ${command}`)), 8000);
-    child.once("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-    child.once("spawn", () => {
-      clearTimeout(timer);
-      child.unref();
-      resolve();
-    });
-  });
-}

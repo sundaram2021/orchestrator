@@ -103,21 +103,6 @@ svg {
   z-index: 500;
   user-select: none;
 }
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-weight: 600;
-  font-size: 12.5px;
-  letter-spacing: 0.2px;
-}
-.brand .mark {
-  width: 17px;
-  height: 17px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, var(--accent), var(--purple));
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
-}
 .crumbbar {
   display: flex;
   align-items: center;
@@ -238,12 +223,6 @@ svg {
 }
 .pill .msep {
   color: var(--faint);
-  flex-shrink: 0;
-}
-.hdot {
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
   flex-shrink: 0;
 }
 .sdot {
@@ -572,10 +551,6 @@ svg {
   min-width: 0;
   overflow: hidden;
 }
-.actions-wrap {
-  position: relative;
-  margin-left: auto;
-}
 .actions-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -692,14 +667,6 @@ svg {
   max-width: 460px;
   line-height: 1.6;
 }
-.center-hero kbd {
-  font-family: var(--mono);
-  font-size: 11px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
-  border-radius: 5px;
-  padding: 1px 5px;
-}
 .hero-chips {
   display: flex;
   gap: 8px;
@@ -783,15 +750,6 @@ svg {
   max-height: 160px;
   overflow: auto;
 }
-.msg .who {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
-  color: var(--faint);
-  margin-bottom: -2px;
-}
-
 /* ── Composer (T3 two-row) ────────────────────────────────── */
 .composer {
   flex-shrink: 0;
@@ -1127,16 +1085,6 @@ svg {
   color: var(--faint);
   font-size: 9px;
 }
-.node .fx {
-  width: 16px;
-  font-size: 9.5px;
-  text-align: center;
-  color: var(--faint);
-  font-family: var(--mono);
-}
-.node.active .fx {
-  color: var(--accent);
-}
 .node .nm {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1224,12 +1172,6 @@ svg {
 }
 
 /* ── Editor ───────────────────────────────────────────────── */
-.editor-pane {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
 .editor-bar {
   display: flex;
   align-items: center;

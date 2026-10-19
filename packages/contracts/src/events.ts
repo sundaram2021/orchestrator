@@ -3,7 +3,6 @@ import { AttachmentMetaSchema } from "./attachments.js";
 import { AppConfigSchema, HarnessStatusSchema, McpStatusSchema } from "./config.js";
 
 export const MessageRoleSchema = z.enum(["user", "assistant", "system"]);
-export type MessageRole = z.infer<typeof MessageRoleSchema>;
 
 export const UsageSchema = z.object({
   input: z.number(),
@@ -18,7 +17,6 @@ export const UsageSchema = z.object({
 export type Usage = z.infer<typeof UsageSchema>;
 
 export const AgentStatusSchema = z.enum(["running", "stopped", "done", "error"]);
-export type AgentStatus = z.infer<typeof AgentStatusSchema>;
 
 export const ThreadStartedSchema = z.object({
   type: z.literal("thread.started"),

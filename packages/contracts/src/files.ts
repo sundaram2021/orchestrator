@@ -45,12 +45,6 @@ export const GitBranchesSchema = z.object({
 });
 export type GitBranches = z.infer<typeof GitBranchesSchema>;
 
-export const GitResultSchema = z.object({
-  ok: z.boolean(),
-  output: z.string(),
-});
-export type GitResult = z.infer<typeof GitResultSchema>;
-
 export const CheckpointSchema = z.object({
   sha: z.string(),
   label: z.string(),

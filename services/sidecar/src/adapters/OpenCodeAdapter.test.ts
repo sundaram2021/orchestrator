@@ -9,7 +9,7 @@ test("parses streamed text parts", () => {
     sessionID: "ses_1",
     part: { type: "text", text: "pong" },
   });
-  assert.deepEqual(parseRunLine(line), [{ kind: "assistant", text: "pong", delta: true }]);
+  assert.deepEqual(parseRunLine(line), [{ kind: "assistant", text: "pong" }]);
 });
 
 test("parses tool calls with completed state", () => {

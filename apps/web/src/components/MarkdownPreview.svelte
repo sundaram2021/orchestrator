@@ -1,19 +1,22 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { renderMarkdown } from "../lib/markdown";
   import { normalizeFileRef, session } from "../lib/session.svelte";
 
-  let { source, onFile }: { source: string; onFile?: (path: string) => void } = $props();
+  let { source }: { source: string } = $props();
 
   const html = $derived(renderMarkdown(source));
 
   let copied = $state(false);
   let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
+  onDestroy(() => {
+    if (copyTimer) clearTimeout(copyTimer);
+  });
+
   const openRef = (raw: string): void => {
     const path = normalizeFileRef(raw);
-    if (!path) return;
-    if (onFile) onFile(path);
-    else void session.openFile(path);
+    if (path) void session.openFile(path);
   };
 
   const onClick = (event: MouseEvent): void => {

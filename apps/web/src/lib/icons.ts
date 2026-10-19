@@ -1,4 +1,5 @@
 import type { Component } from "svelte";
+import { extOf } from "./paths";
 import {
   FileCode,
   FileText,
@@ -35,12 +36,12 @@ const map: Record<string, string> = {
 };
 
 export const fileIcon = (name: string): string => {
-  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  const ext = extOf(name);
   return map[ext] ?? "··";
 };
 
 export const fileGlyph = (name: string): Component => {
-  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  const ext = extOf(name);
   if (["ts", "tsx", "js", "jsx", "mjs", "cjs", "svelte", "vue", "rs", "go", "py", "rb", "java", "c", "cpp", "h", "cs", "php", "css", "scss", "html", "sh", "sql"].includes(ext))
     return FileCode;
   if (["json", "jsonc", "yml", "yaml", "toml", "lock"].includes(ext)) return FileJson;
@@ -53,7 +54,7 @@ export const fileGlyph = (name: string): Component => {
 };
 
 export const languageOf = (path: string): string => {
-  const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
+  const ext = extOf(path);
   switch (ext) {
     case "ts":
     case "tsx":

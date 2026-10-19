@@ -7,15 +7,13 @@ import type {
 } from "@orchestrator/contracts";
 import { uid } from "../util/ids.js";
 
-const blankConfig = (config: AppConfig) => config;
-
 export class ReadModel {
   private threads = new Map<string, ThreadView>();
   private config: AppConfig;
   private lastSeq = -1;
 
   constructor(initialConfig: AppConfig) {
-    this.config = blankConfig(initialConfig);
+    this.config = initialConfig;
   }
 
   setConfig(config: AppConfig): void {
@@ -144,6 +142,10 @@ export class ReadModel {
       case "turn.completed":
         break;
     }
+  }
+
+  find(threadId: string): ThreadView | undefined {
+    return this.threads.get(threadId);
   }
 
   snapshot(): ReadModelData {

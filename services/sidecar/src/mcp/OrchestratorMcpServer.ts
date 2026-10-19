@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { PROTOCOL_VERSION } from "./protocol.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ThreadView } from "@orchestrator/contracts";
+import { asRecord, errMessage } from "../util/coerce.js";
 
-const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_NAME = "orchestrator";
 const SERVER_VERSION = "0.1.0";
 
@@ -135,9 +136,6 @@ interface JsonRpcResponse {
   result?: unknown;
   error?: { code: number; message: string; data?: unknown };
 }
-
-const rec = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
 const strArg = (args: Record<string, unknown>, key: string): string | undefined => {
   const value = args[key];
@@ -300,7 +298,7 @@ export async function handleMcpMessage(
 
   switch (method) {
     case "initialize": {
-      const params = rec(message.params);
+      const params = asRecord(message.params);
       const requested = typeof params.protocolVersion === "string" ? params.protocolVersion : PROTOCOL_VERSION;
       return ok(id, {
         protocolVersion: requested,
@@ -313,14 +311,14 @@ export async function handleMcpMessage(
     case "tools/list":
       return ok(id, { tools: ORCHESTRATOR_TOOLS });
     case "tools/call": {
-      const params = rec(message.params);
+      const params = asRecord(message.params);
       const name = typeof params.name === "string" ? params.name : "";
-      const args = rec(params.arguments);
+      const args = asRecord(params.arguments);
       try {
         const text = await callOrchestratorTool(api, name, args);
         return ok(id, { content: [{ type: "text", text }] });
       } catch (error) {
-        const text = `Error: ${error instanceof Error ? error.message : String(error)}`;
+        const text = `Error: ${errMessage(error)}`;
         return ok(id, { content: [{ type: "text", text }], isError: true });
       }
     }

@@ -76,10 +76,6 @@ export class EventStore {
     return this.events.filter((e) => e.seq >= fromSeq);
   }
 
-  all(): readonly DomainEvent[] {
-    return this.events;
-  }
-
   get lastSeq(): number {
     return this.seq - 1;
   }

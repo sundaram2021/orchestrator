@@ -5,4 +5,4 @@ import "./app.css";
 const target = document.getElementById("app");
 if (!target) throw new Error("missing #app root");
 
-export default mount(App, { target });
+mount(App, { target });

@@ -87,12 +87,20 @@ export class RpcClient {
     };
 
     ws.onclose = () => {
+      if (this.ws !== ws) return;
       this.ws = null;
+      this.rejectPending("connection closed");
       this.setState("closed");
       this.scheduleReconnect();
     };
 
     ws.onerror = () => ws.close();
+  }
+
+  private rejectPending(reason: string): void {
+    const pending = [...this.pending.values()];
+    this.pending.clear();
+    for (const p of pending) p.reject(new Error(reason));
   }
 
   private scheduleReconnect(): void {

@@ -78,7 +78,6 @@ export const ClientRequestSchema = z.object({
   method: z.enum(METHOD_NAMES),
   params: z.unknown().optional(),
 });
-export type ClientRequest = z.infer<typeof ClientRequestSchema>;
 
 export const ServerReplySchema = z.object({
   id: z.string(),

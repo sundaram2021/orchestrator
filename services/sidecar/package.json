@@ -14,8 +14,7 @@
   "dependencies": {
     "@orchestrator/contracts": "workspace:*",
     "cross-spawn": "^7.0.6",
-    "ws": "^8.18.0",
-    "zod": "^3.23.8"
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/cross-spawn": "^6.0.6",

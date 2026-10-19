@@ -2,6 +2,7 @@
   import { Plus, GitCommitHorizontal, GitPullRequest, Upload, GitBranch } from "@lucide/svelte";
   import { session } from "../lib/session.svelte";
   import { fileGlyph } from "../lib/icons";
+  import { baseName } from "../lib/paths";
 
   const git = $derived(session.git);
   const branches = $derived(session.branches);
@@ -31,7 +32,7 @@
         <button class="chg-name" title={f.path} onclick={() => void session.openDiff(f.path)}>
           <span class="chg-st" class:add={f.index === "A"} class:del={f.index === "D"}>{f.index !== " " && f.index !== "?" ? f.index : "U"}</span>
           <span class="ffile"><Glyph size={14} /></span>
-          <span class="txt">{f.path.split("/").pop()}</span>
+          <span class="txt">{baseName(f.path)}</span>
           <span class="dirtext">{f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/")) : ""}</span>
         </button>
         {#if f.worktree !== " "}

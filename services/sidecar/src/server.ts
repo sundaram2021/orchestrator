@@ -1,4 +1,5 @@
 import http from "node:http";
+import { errMessage } from "./util/coerce.js";
 import { WebSocketServer, WebSocket } from "ws";
 import {
   ClientRequestSchema,
@@ -83,7 +84,7 @@ export function startServer(
         const result = await handlers.handle(method, params);
         reply({ id, ok: true, result });
       } catch (err) {
-        reply({ id, ok: false, error: err instanceof Error ? err.message : String(err) });
+        reply({ id, ok: false, error: errMessage(err) });
       }
     });
 

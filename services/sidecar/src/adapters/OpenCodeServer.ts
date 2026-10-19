@@ -28,10 +28,6 @@ export class OpenCodeServer {
 
   constructor(private readonly env: NodeJS.ProcessEnv) {}
 
-  get running(): boolean {
-    return this.base !== null && this.child !== null;
-  }
-
   async url(cwd: string): Promise<string> {
     if (this.base) return this.base;
     if (!this.starting) this.starting = this.start(cwd).finally(() => (this.starting = null));

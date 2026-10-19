@@ -10,7 +10,6 @@ export const HarnessStatusSchema = z.enum([
 export type HarnessStatus = z.infer<typeof HarnessStatusSchema>;
 
 export const HarnessIdSchema = z.string();
-export type HarnessId = z.infer<typeof HarnessIdSchema>;
 
 export const ModelRefSchema = z.object({
   harness: HarnessIdSchema,

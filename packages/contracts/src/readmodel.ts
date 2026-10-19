@@ -45,7 +45,6 @@ export const RuntimeStatusSchema = z.object({
   agentsRunning: z.number().int(),
   totalThreads: z.number().int(),
 });
-export type RuntimeStatus = z.infer<typeof RuntimeStatusSchema>;
 
 export const ReadModelSchema = z.object({
   threads: z.array(ThreadViewSchema),

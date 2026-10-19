@@ -101,18 +101,6 @@ export class AntigravityHarness implements HarnessAdapter {
     return [];
   }
 
-  async refreshModels(): Promise<ModelDescriptor[]> {
-    const runtime = resolveRuntime();
-    if (!runtime) return this.modelCache;
-    const session = await this.spawnSession(runtime, path.join(runtimeDir, "antigravity", "probe"));
-    try {
-      this.captureModels(session.options);
-    } finally {
-      session.client.close();
-    }
-    return this.modelCache;
-  }
-
   private captureModels(options: ConfigOption[]): void {
     const model = options.find((option) => option.id === "model");
     if (!model || !Array.isArray(model.options)) return;
@@ -390,6 +378,13 @@ export class AntigravityHarness implements HarnessAdapter {
     live.client.notify("session/cancel", { sessionId: live.sessionId });
   }
 
+  async disposeSession(session: SessionHandle): Promise<void> {
+    const live = this.sessions.get(session.id);
+    if (!live) return;
+    live.client.close();
+    this.sessions.delete(session.id);
+  }
+
   async disposeWorkspace(dir: string): Promise<void> {
     for (const [id, session] of this.sessions) {
       if (session.cwd === dir) {
@@ -455,8 +450,8 @@ function mapUpdate(
     if (content?.type === "text" && typeof content.text === "string" && content.text) {
       return [
         kind === "agent_thought_chunk"
-          ? { kind: "reasoning", text: content.text, delta: true }
-          : { kind: "assistant", text: content.text, delta: true },
+          ? { kind: "reasoning", text: content.text }
+          : { kind: "assistant", text: content.text },
       ];
     }
     return [];

@@ -2,6 +2,7 @@
   import { session } from "../lib/session.svelte";
   import { MessageSquare, X } from "@lucide/svelte";
   import { fileIcon } from "../lib/icons";
+  import { baseName } from "../lib/paths";
 
   const showChat = $derived(session.view === "chat" || !session.activeFile);
 </script>
@@ -21,7 +22,7 @@
       onkeydown={(e) => e.key === "Enter" && void session.openFile(tab)}
     >
       <span class="fx">{fileIcon(tab)}</span>
-      <span>{tab.split("/").pop()}</span>
+      <span>{baseName(tab)}</span>
       {#if session.dirty[tab]}<span class="dirty">●</span>{/if}
       <span
         class="x"

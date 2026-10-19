@@ -43,10 +43,6 @@ export class McpManager {
     return this.servers.map((s) => s.config);
   }
 
-  get enabledCount(): number {
-    return this.servers.filter((s) => s.config.enabled).length;
-  }
-
   private find(name: string): LoadedMcpServer | undefined {
     return this.servers.find((s) => s.config.name === name);
   }
@@ -104,10 +100,6 @@ export class McpManager {
     await Promise.all(
       this.servers.filter((s) => s.config.enabled).map((s) => this.connect(s.config.name)),
     );
-  }
-
-  isConnected(name: string): boolean {
-    return this.connections.has(name);
   }
 
   async callTool(name: string, tool: string, args: Record<string, unknown>): Promise<string> {
