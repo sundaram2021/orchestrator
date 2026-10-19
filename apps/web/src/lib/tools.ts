@@ -110,6 +110,19 @@ export const toolLabel = (name: string): string => pretty(name);
 
 const str = (value: unknown): string | null => (typeof value === "string" && value ? value : null);
 
+/** Trim absolute/worktree paths down to just the file name for compact display. */
+export const shortPath = (value: string): string => {
+  const trimmed = value.trim();
+  const stripped = trimmed.replace(/^.*?worktrees[\\/][^\\/]+[\\/]/i, "");
+  const candidate = stripped !== trimmed ? stripped : trimmed;
+  if (!/[\\/]/.test(candidate)) return candidate;
+  const isAbsolute =
+    /^[A-Za-z]:[\\/]/.test(candidate) || candidate.startsWith("/") || candidate.startsWith("\\\\");
+  if (!isAbsolute) return candidate;
+  const segments = candidate.split(/[\\/]+/).filter(Boolean);
+  return segments[segments.length - 1] ?? candidate;
+};
+
 export const toolSummary = (name: string, args: string): string => {
   let obj: Record<string, unknown> = {};
   try {
@@ -118,18 +131,25 @@ export const toolSummary = (name: string, args: string): string => {
   } catch {
     return args.slice(0, 110);
   }
-  const pick =
-    str(obj.command) ??
+  const limit = (text: string): string => (text.length > 120 ? `${text.slice(0, 117)}…` : text);
+  const command = str(obj.command);
+  if (command) return limit(command);
+  const pathPick =
     str(obj.filePath) ??
     str(obj.path) ??
     str(obj.file) ??
+    str(obj.absolutePath) ??
+    str(obj.filename) ??
+    str(obj.target);
+  if (pathPick) return limit(shortPath(pathPick));
+  const pick =
     str(obj.pattern) ??
     str(obj.query) ??
     str(obj.url) ??
     str(obj.description) ??
     str(obj.prompt) ??
     str(obj.name);
-  if (pick) return pick.length > 120 ? `${pick.slice(0, 117)}…` : pick;
+  if (pick) return limit(pick);
   const first = Object.values(obj).find((v) => typeof v === "string");
   return typeof first === "string" ? first.slice(0, 110) : "";
 };
