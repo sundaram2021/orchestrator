@@ -69,13 +69,15 @@
   </div>
 
   <div class="sb-search">
-    <span class="search-ic"><Search size={13} /></span>
-    <input class="search has-ic" bind:value={q} placeholder="Search agents…" />
-    {#if session.threads.length}
-      <button class="clearbtn" title="Clear all chats" aria-label="Clear all chats" onclick={clearAll}>
-        <Trash2 size={13} />
-      </button>
-    {/if}
+    <div class="search-wrap">
+      <span class="search-ic"><Search size={13} /></span>
+      <input class="search has-ic" bind:value={q} placeholder="Search agents…" />
+      {#if session.threads.length}
+        <button class="clearbtn" title="Clear all chats" aria-label="Clear all chats" onclick={clearAll}>
+          <Trash2 size={13} />
+        </button>
+      {/if}
+    </div>
   </div>
 
   <div class="sb-body">
@@ -135,26 +137,26 @@
 {/snippet}
 
 <style>
+  .search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
   .search-ic {
     position: absolute;
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 10px;
+    display: grid;
+    place-items: center;
     color: var(--faint);
     pointer-events: none;
   }
-  .sb-search {
-    position: relative;
-  }
   .search.has-ic {
-    padding-left: 30px;
-    padding-right: 32px;
+    padding-left: 31px;
+    padding-right: 34px;
   }
   .clearbtn {
     position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
+    right: 6px;
     display: grid;
     place-items: center;
     width: 22px;

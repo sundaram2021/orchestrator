@@ -14,7 +14,7 @@ import { WorktreeService } from "./git/WorktreeService.js";
 import { RequestHandlers } from "./rpc/RequestHandlers.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { startServer } from "./server.js";
-import { journalPath, userConfigPath } from "./config/paths.js";
+import { journalPath, userConfigPath, worktreesDir } from "./config/paths.js";
 import { logger } from "./util/logger.js";
 
 const log = logger("main");
@@ -63,9 +63,11 @@ async function main(): Promise<void> {
     worktrees,
     bus,
   });
+  const files = new FilesService(workspace);
+  files.allowRoot(worktreesDir);
   const handlers = new RequestHandlers({
     orchestrator,
-    files: new FilesService(workspace),
+    files,
     git: new GitService(workspace),
     adapters,
     mcp,

@@ -19,17 +19,22 @@ const MAX_DEPTH = 12;
 
 export class FilesService {
   private readonly root: string;
+  private readonly extraRoots: string[] = [];
 
   constructor(root: string) {
     this.root = path.resolve(root);
   }
 
+  allowRoot(dir: string): void {
+    const abs = path.resolve(dir);
+    if (abs !== this.root && !this.extraRoots.includes(abs)) this.extraRoots.push(abs);
+  }
+
   private resolve(relative: string): string {
     const abs = path.resolve(this.root, relative || ".");
-    if (abs !== this.root && !abs.startsWith(this.root + path.sep)) {
-      throw new Error("path is outside the workspace");
-    }
-    return abs;
+    const under = (base: string): boolean => abs === base || abs.startsWith(base + path.sep);
+    if (under(this.root) || this.extraRoots.some(under)) return abs;
+    throw new Error("path is outside the workspace");
   }
 
   async listTree(relative = "", depth = MAX_DEPTH): Promise<FileNode[]> {

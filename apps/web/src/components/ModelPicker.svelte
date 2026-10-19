@@ -98,7 +98,7 @@
 
 {#snippet row(harness: string, id: string, name: string)}
   <div
-    class="mrow"
+    class="mpop-row"
     role="button"
     tabindex="0"
     onclick={() => void pick(harness, id, name)}

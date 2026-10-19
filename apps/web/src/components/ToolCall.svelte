@@ -1,10 +1,21 @@
 <script lang="ts">
   import type { ToolView } from "@orchestrator/contracts";
-  import { ChevronDown, ChevronRight, Check, X, Plug } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, X, Plug, RotateCcw } from "@lucide/svelte";
   import { session } from "../lib/session.svelte";
-  import { toolCategory, toolIcon, toolAction, toolSummary, toolLabel, matchMcpServer, mcpLeaf } from "../lib/tools";
+  import { fmtDuration } from "../lib/time";
+  import {
+    toolCategory,
+    toolIcon,
+    toolAction,
+    toolSummary,
+    toolLabel,
+    matchMcpServer,
+    mcpLeaf,
+    parseToolResult,
+  } from "../lib/tools";
+  import MarkdownPreview from "./MarkdownPreview.svelte";
 
-  let { tool }: { tool: ToolView } = $props();
+  let { tool, retried = false }: { tool: ToolView; retried?: boolean } = $props();
   let open = $state(false);
 
   const servers = $derived(session.config?.mcp ?? []);
@@ -15,49 +26,73 @@
   const target = $derived(toolSummary(tool.tool, tool.args));
 
   const pending = $derived(tool.ok === undefined);
-  const failed = $derived(tool.ok === false);
+  const failed = $derived(tool.ok === false && !retried);
 
-  const duration = $derived(tool.startedAt && tool.endedAt ? Math.max(0, tool.endedAt - tool.startedAt) : null);
-  const durationText = $derived(duration === null ? "" : duration < 1000 ? `${duration}ms` : `${(duration / 1000).toFixed(1)}s`);
-
-  const argsText = $derived(
-    (() => {
-      try {
-        return JSON.stringify(JSON.parse(tool.args) as unknown, null, 2);
-      } catch {
-        return tool.args;
-      }
-    })(),
+  const durationText = $derived(
+    tool.startedAt && tool.endedAt ? fmtDuration(Math.max(0, tool.endedAt - tool.startedAt)) : "",
   );
+
+  const result = $derived(parseToolResult(tool.result));
+  const host = (url: string): string => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return url;
+    }
+  };
 </script>
 
-<div class="tool cat-{cat}" class:failed class:running={pending}>
+<div class="tool cat-{cat}" class:failed class:retried={retried && tool.ok === false} class:running={pending}>
   <button class="tool-head" onclick={() => (open = !open)}>
     <span class="tico"><Icon size={13} strokeWidth={2} /></span>
-    {#if server}
-      <span class="mpill">{server}</span>
-      <span class="tname">{action}</span>
-    {:else}
-      <span class="tname">{action}</span>
-    {/if}
+    {#if server}<span class="mpill">{server}</span>{/if}
+    <span class="tname">{action}</span>
     {#if target}<span class="tsum">{target}</span>{/if}
     <span class="spacer"></span>
     {#if pending}
       <span class="spinner"></span>
     {:else if failed}
-      <span class="stat bad"><X size={12} /> {durationText || "failed"}</span>
-    {:else}
-      <span class="stat ok"><Check size={12} /> {durationText}</span>
+      <span class="stat bad"><X size={12} /></span>
+    {:else if retried}
+      <span class="stat retried"><RotateCcw size={12} /> retried</span>
+    {:else if durationText}
+      <span class="stat">{durationText}</span>
     {/if}
-    <span class="chev">{#if open}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}</span>
+    {#if result.kind !== "empty"}
+      <span class="chev">{#if open}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}</span>
+    {/if}
   </button>
-  {#if open}
-    <div class="tool-body">
-      <div class="lbl">{server ? "mcp tool" : "arguments"}</div>
-      <pre>{argsText}</pre>
-      {#if tool.result !== undefined}
-        <div class="lbl">result</div>
-        <pre class:err={failed}>{tool.result}</pre>
+  {#if open && result.kind !== "empty"}
+    <div class="tool-body" class:err={failed}>
+      {#if result.kind === "records"}
+        <div class="recs">
+          {#each result.items as item, i (i)}
+            <div class="rec">
+              {#if item.url}
+                <a class="rec-link" href={item.url} target="_blank" rel="noopener noreferrer">
+                  <span class="rec-title">{item.title}</span>
+                  <span class="rec-host">{host(item.url)}</span>
+                </a>
+              {:else}
+                <span class="rec-title">{item.title}</span>
+              {/if}
+              {#if item.snippet}<p class="rec-snippet">{item.snippet}</p>{/if}
+            </div>
+          {/each}
+        </div>
+      {:else if result.kind === "fields"}
+        <div class="fields">
+          {#each result.entries as entry (entry.key)}
+            <div class="field">
+              <span class="fkey">{entry.key}</span>
+              <span class="fval">{entry.value}</span>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="out">
+          <MarkdownPreview source={result.text} />
+        </div>
       {/if}
     </div>
   {/if}
@@ -65,36 +100,21 @@
 
 <style>
   .tool {
-    border: 1px solid var(--border-soft);
-    border-radius: 9px;
-    background: var(--surface);
-    overflow: hidden;
-  }
-  .tool.running {
-    border-color: color-mix(in srgb, var(--accent) 45%, var(--border-soft));
-  }
-  .tool.failed {
-    border-color: color-mix(in srgb, var(--red) 45%, var(--border-soft));
+    border-radius: 7px;
   }
   .tool-head {
     display: flex;
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 7px 10px;
+    padding: 4px 8px;
     background: transparent;
     border: 0;
     text-align: left;
   }
-  .tool-head:hover {
-    background: var(--surface-2);
-  }
   .tico {
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
-    background: var(--surface-2);
-    border: 1px solid var(--border-soft);
+    width: 16px;
+    height: 16px;
     display: grid;
     place-items: center;
     color: var(--muted);
@@ -109,13 +129,16 @@
   .cat-mcp .tico { color: var(--amber); }
   .tool.running .tico { color: var(--accent); }
   .tool.failed .tico { color: var(--red); }
+  .tool.retried .tico { color: var(--muted); }
   .tname {
     font-size: 12.5px;
     color: var(--text);
-    font-weight: 500;
+    font-weight: 600;
     flex-shrink: 0;
   }
   .mpill {
+    display: inline-flex;
+    align-items: center;
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0.2px;
@@ -127,9 +150,8 @@
     flex-shrink: 0;
   }
   .tsum {
-    color: var(--faint);
-    font-family: var(--mono);
-    font-size: 11.5px;
+    color: var(--muted);
+    font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -138,14 +160,14 @@
   .stat {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     font-size: 11px;
     color: var(--faint);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }
-  .stat.ok { color: var(--green); }
   .stat.bad { color: var(--red); }
+  .stat.retried { color: var(--muted); }
   .chev {
     display: grid;
     place-items: center;
@@ -167,34 +189,85 @@
     }
   }
   .tool-body {
-    border-top: 1px solid var(--border-soft);
-    padding: 8px 10px 10px;
+    margin: 2px 0 6px 8px;
+    padding-left: 14px;
+    border-left: 1px solid var(--border-soft);
+    min-width: 0;
+  }
+  .recs {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 2px;
   }
-  .tool-body .lbl {
-    font-size: 10px;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
+  .rec {
+    padding: 5px 0;
+  }
+  .rec + .rec {
+    border-top: 1px solid var(--border-soft);
+  }
+  .rec-link {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    text-decoration: none;
+  }
+  .rec-title {
+    font-size: 12.5px;
+    color: var(--text);
+    font-weight: 560;
+  }
+  .rec-link:hover .rec-title {
+    color: var(--accent);
+  }
+  .rec-host {
+    font-size: 11px;
     color: var(--faint);
+    flex-shrink: 0;
   }
-  .tool-body pre {
-    margin: 0;
-    font-family: var(--mono);
-    font-size: 11.5px;
-    line-height: 1.5;
+  .rec-snippet {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.55;
     color: var(--muted);
-    background: var(--canvas);
-    border: 1px solid var(--border-soft);
-    border-radius: 7px;
-    padding: 8px 10px;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    max-height: 240px;
-    overflow: auto;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
-  .tool-body pre.err {
+  .fields {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+  }
+  .field {
+    display: grid;
+    grid-template-columns: minmax(80px, 160px) 1fr;
+    gap: 10px;
+    font-size: 12px;
+    align-items: baseline;
+  }
+  .fkey {
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .fval {
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .out {
+    padding: 4px 0 2px;
+    max-height: 420px;
+    overflow: auto;
+    font-size: 12.5px;
+  }
+  .out :global(.md) {
+    max-width: none;
+    font-size: 12.5px;
+  }
+  .tool-body.err .out :global(.md) {
     color: var(--red);
   }
 </style>

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Plug, Sparkles, Paperclip, Gauge, User } from "@lucide/svelte";
+  import { GitBranch, Paperclip, Gauge, User } from "@lucide/svelte";
   import { session, harnessOf, harnessName } from "../lib/session.svelte";
-  import { fmtTokens, contextUsed, usageTooltip } from "../lib/usage";
+  import { fmtTokens, contextUsed, contextPct, usageTooltip } from "../lib/usage";
   import Message from "./Message.svelte";
   import Composer from "./Composer.svelte";
   import ProviderIcon from "./ProviderIcon.svelte";
@@ -12,8 +12,6 @@
 
   const thread = $derived(session.activeThread);
   const running = $derived(thread?.status === "running");
-  const mcp = $derived((session.config?.mcp ?? []).filter((s) => s.enabled));
-  const skills = $derived((session.config?.skills ?? []).filter((s) => s.enabled));
   const sig = $derived(
     thread ? thread.messages.reduce((n, m) => n + m.text.length + m.tools.length * 4, 0) : 0,
   );
@@ -48,21 +46,13 @@
         <span class="pill">
           <ProviderIcon id={thread.harness} color={harnessOf(thread.harness)?.color} size={12} />
           <span class="txt">{harnessName(thread.harness)}</span>
+          <span class="msep">·</span>
+          <span class="txt">{thread.model}</span>
         </span>
-        <span class="pill"><span class="txt">{thread.model}</span></span>
         {#if thread.branch}
-          <span class="pill" title="Isolated worktree branch"><span class="txt">{thread.branch}</span></span>
-        {/if}
-        {#if mcp.length}
-          <span class="pill" title={mcp.map((s) => s.name).join(", ")}>
-            <Plug size={11} />
-            <span class="txt">{mcp.length} MCP</span>
-          </span>
-        {/if}
-        {#if skills.length}
-          <span class="pill" title={skills.map((s) => s.name).join(", ")}>
-            <Sparkles size={11} />
-            <span class="txt">{skills.length} skills</span>
+          <span class="pill" title="Isolated worktree branch">
+            <GitBranch size={11} />
+            <span class="txt">{thread.branch}</span>
           </span>
         {/if}
         {#if thread.usage}
@@ -71,7 +61,7 @@
             <span class="txt">
               {fmtTokens(contextUsed(thread.usage))}{thread.usage.contextLimit
                 ? `/${fmtTokens(thread.usage.contextLimit)}`
-                : " tok"}
+                : " tok"}{contextPct(thread.usage) !== null ? ` · ${contextPct(thread.usage)}%` : ""}
             </span>
           </span>
         {/if}
@@ -125,8 +115,12 @@
             <span class="av av-user" title="You"><User size={14} /></span>
           </div>
         {/if}
-        {#each thread.messages as message (message.id)}
-          <Message {message} {running} />
+        {#each thread.messages as message, i (message.id)}
+          <Message
+            {message}
+            {running}
+            showAvatar={i === 0 || thread.messages[i - 1]?.role !== message.role}
+          />
         {/each}
       </div>
     {/if}

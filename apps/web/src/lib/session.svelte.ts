@@ -21,6 +21,24 @@ const uid = (): string =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
 
+/** Normalize a file reference from markdown/tool output into a path the sidecar can read. */
+export const normalizeFileRef = (raw: string): string | null => {
+  let value = raw.trim().replace(/^[`"'<(]+|[`"'>)]+$/g, "");
+  if (!value) return null;
+  if (value.startsWith("file://")) {
+    try {
+      value = decodeURIComponent(new URL(value).pathname);
+    } catch {
+      value = decodeURIComponent(value.slice("file://".length));
+    }
+    if (/^\/[A-Za-z]:/.test(value)) value = value.slice(1);
+  }
+  value = value.replace(/[#?].*$/, "").replace(/:(\d+)(?::\d+)?$/, "");
+  value = value.trim();
+  if (!value || /[\n\r]/.test(value)) return null;
+  return value;
+};
+
 const resolveUrl = (): string => {
   if (typeof window === "undefined") return "ws://127.0.0.1:4123";
   if (window.__ORCHESTRATOR_WS__) return window.__ORCHESTRATOR_WS__;
@@ -419,13 +437,15 @@ class Session {
   }
 
   async openFile(path: string): Promise<void> {
+    const target = normalizeFileRef(path);
+    if (!target) return;
     try {
-      if (this.fileContents[path] === undefined) {
-        const file = await this.client.request("readFile", { path });
-        this.fileContents = { ...this.fileContents, [path]: file.content };
+      if (this.fileContents[target] === undefined) {
+        const file = await this.client.request("readFile", { path: target });
+        this.fileContents = { ...this.fileContents, [target]: file.content };
       }
-      if (!this.openTabs.includes(path)) this.openTabs = [...this.openTabs, path];
-      this.activeFile = path;
+      if (!this.openTabs.includes(target)) this.openTabs = [...this.openTabs, target];
+      this.activeFile = target;
       this.editorView = "code";
       this.view = "editor";
     } catch (err) {
