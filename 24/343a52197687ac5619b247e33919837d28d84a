@@ -1,0 +1,20 @@
+apps/web/src/lib/tools.ts
+  s_0dc3da93d59c81::t_f0695573af49d4 113-125,134,137,141-145,152
+  s_0dc3da93d59c81::t_ae4ba5c7efdf73 135-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "24343a52197687ac5619b247e33919837d28d84a",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
