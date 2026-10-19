@@ -1,0 +1,91 @@
+services/sidecar/src/rpc/RequestHandlers.ts
+  s_0dc3da93d59c81::t_acb3106c34109e 23,40,44,46,49,53,56,71,77,80,85,88,92,94,109,114
+  s_0dc3da93d59c81::t_0965b159615f0c 8
+apps/web/src/components/ChatView.svelte
+  s_0dc3da93d59c81::t_8799cf7395e968 15-19
+apps/web/src/lib/tools.ts
+  s_0dc3da93d59c81::t_4fc341968c8db6 18,113,184
+apps/web/src/main.ts
+  s_0dc3da93d59c81::t_7bc94554d8f7c6 8
+services/sidecar/src/antigravity/Installation.ts
+  s_0dc3da93d59c81::t_109ee0b68eb454 2,188
+  s_0dc3da93d59c81::t_05f4556204acce 3
+services/sidecar/src/antigravity/AcpClient.ts
+  s_0dc3da93d59c81::t_c8f13b4c3e325a 135
+  s_0dc3da93d59c81::t_43ce7401354c83 4
+services/sidecar/src/adapters/OpenCodeAdapter.ts
+  s_0dc3da93d59c81::t_109ee0b68eb454 2,368
+  s_0dc3da93d59c81::t_e151fdd1ae643d 123,127,236,239,394-395,411,420
+services/sidecar/src/util/coerce.ts
+  s_0dc3da93d59c81::t_006b86b7642bc4 1-25
+services/sidecar/src/Orchestrator.ts
+  s_0dc3da93d59c81::t_109ee0b68eb454 14,386
+  s_0dc3da93d59c81::t_b241885c5606ac 389
+  s_0dc3da93d59c81::t_9842d2a138d631 437
+apps/web/src/lib/icons.ts
+  s_0dc3da93d59c81::t_2f087199e18cb0 2
+  s_0dc3da93d59c81::t_fbdf97d64b45c7 39,44,57
+apps/web/src/lib/session.svelte.ts
+  s_0dc3da93d59c81::t_431d0674e2a93a 223-225
+  s_0dc3da93d59c81::t_4fc341968c8db6 16
+services/sidecar/src/adapters/HarnessAdapter.ts
+  s_0dc3da93d59c81::t_a794c9a1bd9267 11-12
+  s_0dc3da93d59c81::t_ce0c2e697a32be 53-55
+apps/web/src/components/ChangesView.svelte
+  s_0dc3da93d59c81::t_fb845b98358251 5
+  s_0dc3da93d59c81::t_59cdf7ad715648 35
+services/sidecar/src/config/SettingsStore.ts
+  s_0dc3da93d59c81::t_06a869a035ade9 4
+  s_0dc3da93d59c81::t_c640bd6becc157 31-33
+services/sidecar/src/adapters/OpenCodeAdapter.test.ts
+  s_0dc3da93d59c81::t_a15b542e1e7042 12
+services/sidecar/src/mcp/mcpConfig.ts
+  s_0dc3da93d59c81::t_3e5fca00d8389e 4
+services/sidecar/src/mcp/McpClient.ts
+  s_0dc3da93d59c81::t_fa731a2b511dcd 2
+services/sidecar/src/adapters/AntigravityHarness.ts
+  s_0dc3da93d59c81::t_9b35adb2abad9a 381-387
+  s_0dc3da93d59c81::t_e151fdd1ae643d 453-454
+apps/web/src/components/CenterTabs.svelte
+  s_0dc3da93d59c81::t_c8d62d45552ca1 25
+  s_0dc3da93d59c81::t_b75d531593bf3d 5
+services/sidecar/package.json
+  s_0dc3da93d59c81::t_55ffd20c64ed0b 17
+apps/web/src/lib/paths.ts
+  s_0dc3da93d59c81::t_d19ca546e62f22 1-7
+services/sidecar/src/skills/SkillsLoader.ts
+  s_0dc3da93d59c81::t_87b46a4820f240 1
+services/sidecar/src/event/ReadModel.ts
+  s_0dc3da93d59c81::t_78fabc47eed667 16
+  s_0dc3da93d59c81::t_d66713ffb5d55a 147-150
+apps/web/src/lib/rpc.ts
+  s_0dc3da93d59c81::t_f0e4eda618a133 90,92,100-103
+  s_0dc3da93d59c81::t_b082085b5dd5de 104-105
+services/sidecar/src/mcp/OrchestratorMcpServer.ts
+  s_0dc3da93d59c81::t_fa731a2b511dcd 2
+  s_0dc3da93d59c81::t_109ee0b68eb454 321
+  s_0dc3da93d59c81::t_ee8e17553c0819 301,314,316
+  s_0dc3da93d59c81::t_62d45ff2d690c2 5
+apps/web/src/components/MarkdownPreview.svelte
+  s_0dc3da93d59c81::t_717c8054faf35e 2,6,13-16,19
+services/sidecar/src/server.ts
+  s_0dc3da93d59c81::t_109ee0b68eb454 2,87
+services/sidecar/src/mcp/protocol.ts
+  s_0dc3da93d59c81::t_c66592d405f1a2 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c0e21eb9e6177a8c80e2a264860efb956ce22115",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
