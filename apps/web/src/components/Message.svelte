@@ -41,15 +41,14 @@
         : `Worked for ${fmtDuration(workedMs)}`,
   );
 
-  let showActivity = $state(true);
+  let showActivity = $state(false);
   $effect(() => {
-    if (running) showActivity = true;
+    showActivity = running;
   });
 
-  let showReasoning = $state(true);
+  let showReasoning = $state(false);
   $effect(() => {
-    if (reasoningLive) showReasoning = true;
-    else if (hasText) showReasoning = false;
+    showReasoning = reasoningLive;
   });
 </script>
 

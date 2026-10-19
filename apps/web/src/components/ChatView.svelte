@@ -118,7 +118,7 @@
         {#each thread.messages as message, i (message.id)}
           <Message
             {message}
-            {running}
+            running={running && i === thread.messages.length - 1}
             showAvatar={i === 0 || thread.messages[i - 1]?.role !== message.role}
           />
         {/each}
