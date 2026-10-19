@@ -1,0 +1,21 @@
+apps/web/src/components/ChatView.svelte
+  s_0dc3da93d59c81::t_aea4246826ada3 121
+apps/web/src/components/Message.svelte
+  s_0dc3da93d59c81::t_56c6d90cc27228 44,46,49,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d3779bc580b2b9763a74c0fd0cd550fe91dcd848",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
