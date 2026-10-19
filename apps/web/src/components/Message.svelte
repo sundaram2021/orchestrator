@@ -1,16 +1,21 @@
 <script lang="ts">
-  import type { MessageView } from "@orchestrator/contracts";
+  import type { MessageView, ThreadView } from "@orchestrator/contracts";
   import { Brain, ChevronDown, ChevronRight, User } from "@lucide/svelte";
   import { fmtDuration } from "../lib/time";
+  import { harnessOf, harnessName } from "../lib/session.svelte";
   import MarkdownPreview from "./MarkdownPreview.svelte";
   import ToolCall from "./ToolCall.svelte";
   import Logo from "./Logo.svelte";
+  import ProviderIcon from "./ProviderIcon.svelte";
 
   let {
     message,
+    thread,
     running = false,
     showAvatar = true,
-  }: { message: MessageView; running?: boolean; showAvatar?: boolean } = $props();
+  }: { message: MessageView; thread?: ThreadView; running?: boolean; showAvatar?: boolean } = $props();
+
+  const subagent = $derived(!!thread && thread.kind !== "orchestrator");
 
   const hasReasoning = $derived(!!message.reasoning?.trim());
   const hasText = $derived(!!message.text.trim());
@@ -58,7 +63,11 @@
   <div class="mrow user">
     <div class="msg user">{message.text}</div>
     {#if showAvatar}
-      <span class="av av-user" title="You"><User size={14} /></span>
+      {#if subagent && thread}
+        <span class="av av-user" title="Orchestrator"><Logo flat size={18} /></span>
+      {:else}
+        <span class="av av-user" title="You"><User size={14} /></span>
+      {/if}
     {:else}
       <span class="av-spacer"></span>
     {/if}
@@ -66,7 +75,13 @@
 {:else}
   <div class="mrow asst">
     {#if showAvatar}
-      <span class="av av-asst" title="Orchestrator"><Logo flat size={18} /></span>
+      {#if subagent && thread}
+        <span class="av av-asst" title={harnessName(thread.harness)}>
+          <ProviderIcon id={thread.harness} color={harnessOf(thread.harness)?.color} size={16} />
+        </span>
+      {:else}
+        <span class="av av-asst" title="Orchestrator"><Logo flat size={18} /></span>
+      {/if}
     {:else}
       <span class="av-spacer"></span>
     {/if}

@@ -2,11 +2,14 @@
   import type { FileNode } from "@orchestrator/contracts";
   import { FilePlus, RefreshCw, Search } from "@lucide/svelte";
   import { session } from "../lib/session.svelte";
+  import { changeMap } from "../lib/git";
   import FileNodeView from "./FileNodeView.svelte";
 
   let q = $state("");
   type MenuTarget = { x: number; y: number; path: string; type: "file" | "dir" | "root" };
   let menu = $state<MenuTarget | null>(null);
+
+  const changes = $derived(changeMap(session.git));
 
   const filterNodes = (nodes: FileNode[], needle: string): FileNode[] => {
     const out: FileNode[] = [];
@@ -100,7 +103,7 @@
     <div class="empty" style="padding:8px">{q ? "No matches." : "No workspace files."}</div>
   {:else}
     {#each filtered as node (node.path)}
-      <FileNodeView {node} />
+      <FileNodeView {node} {changes} />
     {/each}
   {/if}
 </div>

@@ -23,25 +23,43 @@ import type { ConfigService } from "./config/ConfigService.js";
 import type { McpManager } from "./mcp/McpManager.js";
 import type { SkillsLoader } from "./skills/SkillsLoader.js";
 import type { WorktreeService } from "./git/WorktreeService.js";
+import type { MemoryStore } from "./memory/MemoryStore.js";
 import { uid, truncate } from "./util/ids.js";
+import { parseAgentMentions, slugify, stripAgentMentions } from "./util/mentions.js";
 import { logger } from "./util/logger.js";
 
 const log = logger("orchestrator");
 
-const ORCHESTRATOR_TOOL_NAMES =
-  "orchestrator_capabilities, orchestrator_create_thread, orchestrator_delegate_task, orchestrator_task_status, orchestrator_task_cancel, orchestrator_thread_list, orchestrator_thread_read, orchestrator_thread_wait, orchestrator_thread_interrupt";
+const ORCHESTRATOR_THREAD_ID = "th_orchestrator";
 
-const threadContext = (threadId: string): string =>
-  `You are an agent running inside Orchestrator. Your thread id is "${threadId}". ` +
-  `You can orchestrate other agents through the "orchestrator" MCP tools (${ORCHESTRATOR_TOOL_NAMES}). ` +
-  `Use orchestrator_delegate_task to hand off independent work to a child agent and wait for its result; ` +
-  `pass parent_id="${threadId}" so the child is linked to this thread.`;
+const ORCHESTRATOR_TOOL_NAMES =
+  "orchestrator_capabilities, orchestrator_create_thread, orchestrator_delegate_task, orchestrator_task_status, orchestrator_task_cancel, orchestrator_thread_list, orchestrator_thread_read, orchestrator_thread_wait, orchestrator_thread_interrupt, orchestrator_send_message, orchestrator_memory_write, orchestrator_memory_search, orchestrator_memory_list, orchestrator_agent_registry";
+
+const threadContext = (threadId: string): string => {
+  const role =
+    threadId === ORCHESTRATOR_THREAD_ID
+      ? "You are the Orchestrator of this workspace."
+      : "You are a subagent in this workspace.";
+  return (
+    `${role} Your thread id is "${threadId}". ` +
+    `You can orchestrate other agents through the "orchestrator" MCP tools (${ORCHESTRATOR_TOOL_NAMES}). ` +
+    `Use orchestrator_delegate_task to hand off independent work to a child agent and wait for its result; ` +
+    `pass parent_id="${threadId}" so the child is linked to this thread. ` +
+    `When asked what an agent is doing or how it is going, answer in plain conversational prose: ` +
+    `one or two sentences about its actual current activity. Never use headings, labels, bullet lists, ` +
+    `or a status-report template.`
+  );
+};
 
 interface Run {
   threadId: string;
   session: SessionHandle;
   executor: HarnessAdapter;
+  harness: string;
+  model: string;
+  persistent: boolean;
   stopped: boolean;
+  busy: boolean;
 }
 
 export interface OrchestratorDeps {
@@ -53,12 +71,14 @@ export interface OrchestratorDeps {
   mcp: McpManager;
   skills: SkillsLoader;
   worktrees: WorktreeService;
+  memory: MemoryStore;
   bus: Broadcaster;
 }
 
 export class Orchestrator {
   private readonly runs = new Map<string, Run>();
   private readonly deps: OrchestratorDeps;
+  private orchestratorId: string | null = null;
 
   constructor(deps: OrchestratorDeps) {
     this.deps = deps;
@@ -94,11 +114,30 @@ export class Orchestrator {
         this.emit({ type: "agent.status", threadId: thread.id, status: "stopped" });
       }
     }
+    this.ensureOrchestrator();
     this.deps.mcp.subscribe((server) => {
       this.emit({ type: "mcp.status", name: server.name, status: server.status, tools: server.tools });
     });
     void this.deps.mcp.connectEnabled();
     log.info("orchestrator initialised");
+  }
+
+  private ensureOrchestrator(): void {
+    const existing = this.deps.readModel.snapshot().threads.find((t) => t.kind === "orchestrator");
+    if (existing) {
+      this.orchestratorId = existing.id;
+      return;
+    }
+    const config = this.deps.readModel.snapshot().config;
+    this.orchestratorId = ORCHESTRATOR_THREAD_ID;
+    this.emit({
+      type: "thread.started",
+      threadId: ORCHESTRATOR_THREAD_ID,
+      title: "Orchestrator",
+      harness: config.model.harness || "opencode",
+      model: config.model.id,
+      kind: "orchestrator",
+    });
   }
 
   snapshot(): ReadModelData {
@@ -237,6 +276,12 @@ export class Orchestrator {
       case "StopAgent":
         await this.stopAgent(command.threadId);
         break;
+      case "SendMessage":
+        await this.sendMessage(command.threadId, command.text, command.attachments);
+        break;
+      case "MarkRead":
+        this.markRead(command.threadId);
+        break;
       case "RetryThread":
         this.retryThread(command.threadId, command.model);
         break;
@@ -244,13 +289,13 @@ export class Orchestrator {
         this.forkThread(command.threadId);
         break;
       case "DiscardThread":
-        await this.discardThread(command.threadId);
+        await this.deleteThread(command.threadId);
         break;
       case "MergeThread":
         await this.mergeThread(command.threadId);
         break;
       case "ClearFinished":
-        this.clearFinished();
+        await this.clearFinished();
         break;
       case "ClearAll":
         await this.clearAll();
@@ -313,11 +358,40 @@ export class Orchestrator {
       return;
     }
 
-    const session = await executor.startSession(cwd);
-    const run: Run = { threadId, session, executor, stopped: false };
+    const session = await executor.startSession(cwd).catch((err: unknown) => {
+      this.emit({ type: "agent.error", threadId, message: errMessage(err) });
+      return null;
+    });
+    if (!session) return;
+    const persistent = threadId === this.orchestratorId;
+    const run: Run = { threadId, session, executor, harness, model, persistent, stopped: false, busy: false };
     this.runs.set(threadId, run);
 
-    const system = [threadContext(threadId), this.deps.skills.systemPrompt()].filter(Boolean).join("\n\n");
+    try {
+      await this.runTurn(run, prompt, saved);
+    } finally {
+      if (!persistent) {
+        this.runs.delete(threadId);
+        await executor.disposeSession?.(session);
+      }
+    }
+  }
+
+  private async runTurn(
+    run: Run,
+    prompt: string,
+    saved: { name: string; mime: string; data: string; size: number; path: string }[],
+  ): Promise<void> {
+    const { threadId } = run;
+    run.stopped = false;
+    run.busy = true;
+
+    const view = this.findThread(threadId);
+    const memoryBlock =
+      run.persistent && view ? this.deps.memory.render(view, this.listThreadViews()) : "";
+    const system = [threadContext(threadId), memoryBlock, this.deps.skills.systemPrompt()]
+      .filter(Boolean)
+      .join("\n\n");
 
     const invocation = this.deps.skills.matchInvocation(prompt);
     const effectivePrompt = invocation
@@ -331,6 +405,7 @@ export class Orchestrator {
     const ensureAssistant = (): string => {
       if (!assistantId) {
         assistantId = uid("m");
+        this.markUnread(threadId);
         this.emit({ type: "message.appended", threadId, messageId: assistantId, role: "assistant", text: "" });
       }
       return assistantId;
@@ -350,7 +425,7 @@ export class Orchestrator {
             }
           : {}),
       };
-      for await (const evt of executor.sendTurn(session, effectivePrompt, model, options)) {
+      for await (const evt of run.executor.sendTurn(run.session, effectivePrompt, run.model, options)) {
         if (run.stopped) break;
         switch (evt.kind) {
           case "system":
@@ -373,21 +448,137 @@ export class Orchestrator {
             this.emit({ type: "usage.updated", threadId, usage: evt.usage });
             break;
           case "error":
+            this.markUnread(threadId);
             this.emit({ type: "agent.error", threadId, message: evt.message });
             run.stopped = true;
             break;
           case "done":
             this.emit({ type: "turn.completed", threadId });
-            this.emit({ type: "agent.status", threadId, status: "done" });
+            this.emit({ type: "agent.status", threadId, status: run.persistent ? "idle" : "done" });
             break;
         }
       }
     } catch (err) {
+      this.markUnread(threadId);
       this.emit({ type: "agent.error", threadId, message: errMessage(err) });
     } finally {
-      this.runs.delete(threadId);
-      await run.executor.disposeSession?.(run.session);
+      run.busy = false;
+      if (run.persistent) this.compactMemory();
     }
+  }
+
+  private markUnread(threadId: string): void {
+    if (threadId === this.orchestratorId) return;
+    const thread = this.findThread(threadId);
+    if (!thread || thread.unread) return;
+    this.emit({ type: "thread.unread", threadId });
+  }
+
+  private markRead(threadId: string): void {
+    const thread = this.findThread(threadId);
+    if (!thread?.unread) return;
+    this.emit({ type: "thread.read", threadId });
+  }
+
+  private compactMemory(): void {
+    const thread = this.orchestratorId ? this.findThread(this.orchestratorId) : undefined;
+    if (!thread) return;
+    this.deps.memory.compact(thread.messages);
+    this.deps.memory.syncAgents(this.listThreadViews());
+  }
+
+  memoryWrite(text: string, tags: string[] = []): string {
+    const note = this.deps.memory.writeNote(text, tags, "orchestrator");
+    return `Saved memory ${note.id}: ${note.text}`;
+  }
+
+  memorySearch(query: string, limit = 10): string {
+    const notes = this.deps.memory.search(query, limit);
+    if (!notes.length) return "No matching memories.";
+    return notes
+      .map((note) => `${note.id}${note.tags.length ? ` [${note.tags.join(", ")}]` : ""} ${note.text}`)
+      .join("\n");
+  }
+
+  memoryList(limit = 40): string {
+    const notes = this.deps.memory.snapshot().notes.slice(-limit);
+    if (!notes.length) return "No memories yet.";
+    return notes
+      .map((note) => `${note.id}${note.tags.length ? ` [${note.tags.join(", ")}]` : ""} ${note.text}`)
+      .join("\n");
+  }
+
+  agentRegistry(): string {
+    const threads = this.listThreadViews().filter((thread) => thread.kind !== "orchestrator");
+    if (!threads.length) return "No agents yet.";
+    return threads
+      .map((thread) => {
+        const last = [...thread.messages].reverse().find((m) => m.role === "assistant" && m.text.trim());
+        const parent = thread.parentId ? ` (parent ${thread.parentId})` : "";
+        const tail = last ? ` — ${last.text.replace(/\s+/g, " ").slice(0, 200)}` : "";
+        return `${thread.id} [${thread.status}] ${thread.title}${parent}${tail}`;
+      })
+      .join("\n");
+  }
+
+  async sendMessage(
+    threadId: string,
+    text: string,
+    attachments?: Attachment[],
+  ): Promise<void> {
+    const thread = this.findThread(threadId);
+    if (!thread) return;
+
+    if (thread.kind === "orchestrator") {
+      const targets = this.resolveMentionTargets(text);
+      if (targets.length) {
+        this.emit({ type: "message.appended", threadId, messageId: uid("m"), role: "user", text, source: "user" });
+        const instruction = stripAgentMentions(text) || "Continue with your task and report your current status.";
+        for (const target of targets) await this.sendMessage(target.id, instruction, attachments);
+        this.system(threadId, `Sent to ${targets.map((t) => truncate(t.title, 40)).join(", ")}.`);
+        return;
+      }
+    }
+
+    const saved = attachments?.length ? await this.saveAttachments(threadId, attachments) : [];
+    this.emit({
+      type: "message.appended",
+      threadId,
+      messageId: uid("m"),
+      role: "user",
+      text,
+      source: "user",
+    });
+    const existing = this.runs.get(threadId);
+    if (existing) {
+      if (existing.busy) {
+        this.system(threadId, "Still working on the previous message — try again once it finishes.");
+        return;
+      }
+      this.emit({ type: "agent.status", threadId, status: "running" });
+      void this.runTurn(existing, text, saved);
+      return;
+    }
+    this.emit({ type: "agent.status", threadId, status: "running" });
+    const cwd = thread.worktree ?? this.deps.workspace;
+    void this.runThread(threadId, text, thread.harness, thread.model, cwd, saved);
+  }
+
+  private resolveMentionTargets(text: string): ThreadView[] {
+    const slugs = parseAgentMentions(text);
+    if (!slugs.length) return [];
+    const agents = this.deps.readModel.snapshot().threads.filter((t) => t.kind !== "orchestrator");
+    const bySlug = new Map<string, ThreadView>();
+    for (const agent of agents) {
+      const slug = slugify(agent.title);
+      if (!bySlug.has(slug)) bySlug.set(slug, agent);
+    }
+    const targets: ThreadView[] = [];
+    for (const slug of slugs) {
+      const agent = bySlug.get(slug);
+      if (agent && !targets.includes(agent)) targets.push(agent);
+    }
+    return targets;
   }
 
   private async saveAttachments(
@@ -412,24 +603,38 @@ export class Orchestrator {
     if (!run) return;
     run.stopped = true;
     await run.executor.interrupt(run.session);
-    this.emit({ type: "agent.status", threadId, status: "stopped" });
+    this.emit({ type: "agent.status", threadId, status: run.persistent ? "idle" : "stopped" });
     this.emit({ type: "message.appended", threadId, messageId: uid("m"), role: "system", text: "Stopped by user." });
-    this.runs.delete(threadId);
+    if (run.persistent) run.busy = false;
+    else this.runs.delete(threadId);
   }
 
-  private clearFinished(): void {
-    const threads: ThreadView[] = this.deps.readModel.snapshot().threads;
+  private async clearFinished(): Promise<void> {
+    const threads = this.deps.readModel.snapshot().threads;
+    const byId = new Map(threads.map((thread) => [thread.id, thread]));
+    const blocked = new Set<string>();
     for (const thread of threads) {
-      if (thread.status !== "running") this.emit({ type: "thread.removed", threadId: thread.id });
+      if (thread.status !== "running") continue;
+      let current: ThreadView | undefined = thread;
+      while (current && !blocked.has(current.id)) {
+        blocked.add(current.id);
+        current = current.parentId ? byId.get(current.parentId) : undefined;
+      }
+    }
+    for (const thread of threads) {
+      if (thread.kind === "orchestrator" || blocked.has(thread.id)) continue;
+      await this.deleteThread(thread.id);
     }
   }
 
   private async clearAll(): Promise<void> {
     for (const threadId of [...this.runs.keys()]) {
+      if (threadId === this.orchestratorId) continue;
       await this.stopAgent(threadId);
     }
     for (const thread of this.deps.readModel.snapshot().threads) {
-      this.emit({ type: "thread.removed", threadId: thread.id });
+      if (thread.kind === "orchestrator") continue;
+      await this.deleteThread(thread.id);
     }
   }
 
@@ -439,24 +644,34 @@ export class Orchestrator {
 
   private retryThread(threadId: string, model?: string): void {
     const thread = this.findThread(threadId);
-    if (!thread) return;
+    if (!thread || thread.kind === "orchestrator") return;
     void this.startThread(thread.prompt ?? thread.title, thread.harness, model ?? thread.model, thread.id);
   }
 
   private forkThread(threadId: string): void {
     const thread = this.findThread(threadId);
-    if (!thread) return;
+    if (!thread || thread.kind === "orchestrator") return;
     void this.startThread(thread.prompt ?? thread.title, thread.harness, thread.model, thread.id);
   }
 
-  private async discardThread(threadId: string): Promise<void> {
-    if (this.runs.has(threadId)) await this.stopAgent(threadId);
-    const thread = this.findThread(threadId);
-    if (thread?.worktree) {
-      await this.deps.adapters.releaseWorkspace(thread.worktree);
+  private async deleteThread(threadId: string): Promise<void> {
+    if (threadId === this.orchestratorId) {
+      this.system(threadId, "The orchestrator can't be deleted.");
+      return;
     }
-    if (thread?.branch && thread.worktree) {
-      await this.deps.worktrees.remove({ branch: thread.branch, dir: thread.worktree });
+    const thread = this.findThread(threadId);
+    if (!thread) return;
+    const children = this.deps.readModel
+      .snapshot()
+      .threads.filter((candidate) => candidate.parentId === threadId);
+    for (const child of children) await this.deleteThread(child.id);
+    if (this.runs.has(threadId)) await this.stopAgent(threadId);
+    if (thread.worktree) {
+      await this.deps.adapters.releaseWorkspace(thread.worktree);
+      await this.deps.worktrees.remove({
+        branch: thread.branch ?? this.deps.worktrees.handle(threadId).branch,
+        dir: thread.worktree,
+      });
     }
     this.emit({ type: "thread.removed", threadId });
   }

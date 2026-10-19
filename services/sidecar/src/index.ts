@@ -14,7 +14,8 @@ import { WorktreeService } from "./git/WorktreeService.js";
 import { RequestHandlers } from "./rpc/RequestHandlers.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { startServer } from "./server.js";
-import { journalPath, userConfigPath, worktreesDir } from "./config/paths.js";
+import { journalPath, memoryPath, userConfigPath, worktreesDir } from "./config/paths.js";
+import { MemoryStore } from "./memory/MemoryStore.js";
 import { logger } from "./util/logger.js";
 
 const log = logger("main");
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
   const config = new ConfigService(workspace, adapters, mcp, skills, settings);
 
   const worktrees = new WorktreeService(workspace);
+  const memory = new MemoryStore(memoryPath(workspace));
   const orchestrator = new Orchestrator({
     workspace,
     store,
@@ -61,6 +63,7 @@ async function main(): Promise<void> {
     mcp,
     skills,
     worktrees,
+    memory,
     bus,
   });
   const files = new FilesService(workspace);
@@ -75,6 +78,12 @@ async function main(): Promise<void> {
   });
 
   await orchestrator.init();
+  const activeWorktrees = orchestrator
+    .listThreadViews()
+    .filter((thread) => thread.worktree)
+    .map((thread) => thread.id);
+  const swept = await worktrees.sweep(activeWorktrees);
+  if (swept.length > 0) log.info(`removed ${swept.length} orphan worktree(s)`);
   const server = await startServer(orchestrator, handlers, bus, preferredPort);
 
   mcp.setBuiltin("orchestrator", {

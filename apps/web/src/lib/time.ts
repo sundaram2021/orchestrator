@@ -12,13 +12,15 @@ export const relTime = (ts: number): string => {
 };
 
 export const statusLabel = (status: string): string =>
-  status === "running"
-    ? "Running"
-    : status === "done"
-      ? "Done"
-      : status === "error"
-        ? "Error"
-        : "Stopped";
+  status === "idle"
+    ? "Idle"
+    : status === "running"
+      ? "Running"
+      : status === "done"
+        ? "Done"
+        : status === "error"
+          ? "Error"
+          : "Stopped";
 
 export const fmtDuration = (ms: number): string => {
   if (!Number.isFinite(ms) || ms < 0) return "";

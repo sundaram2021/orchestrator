@@ -29,6 +29,8 @@
         renderWhitespace: "selection",
         tabSize: 2,
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+        padding: { top: 8, bottom: 8 },
+        scrollbar: { verticalScrollbarSize: 12, horizontalScrollbarSize: 12, useShadows: false },
       });
       editor = ed;
       disposeChange = ed.onDidChangeModelContent(() => onChange(ed.getValue()));

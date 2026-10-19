@@ -3,12 +3,18 @@
   import { ChevronRight, ChevronDown, Folder, FolderOpen } from "@lucide/svelte";
   import { session } from "../lib/session.svelte";
   import { fileGlyph } from "../lib/icons";
+  import type { FileChange } from "../lib/git";
   import Self from "./FileNodeView.svelte";
 
-  let { node, depth = 0 }: { node: FileNode; depth?: number } = $props();
+  let {
+    node,
+    depth = 0,
+    changes = new Map<string, FileChange>(),
+  }: { node: FileNode; depth?: number; changes?: Map<string, FileChange> } = $props();
 
   const collapsed = $derived(node.type === "dir" && !!session.collapsed[node.path]);
   const Glyph = $derived(fileGlyph(node.name));
+  const change = $derived(node.type === "file" ? (changes.get(node.path) ?? null) : null);
 </script>
 
 {#if node.type === "dir"}
@@ -28,7 +34,7 @@
   </div>
   {#if !collapsed}
     {#each node.children ?? [] as child (child.path)}
-      <Self node={child} depth={depth + 1} />
+      <Self node={child} depth={depth + 1} {changes} />
     {/each}
   {/if}
 {:else}
@@ -45,6 +51,9 @@
   >
     <span class="fico"><Glyph size={14} /></span>
     <span class="nm">{node.name}</span>
+    {#if change}
+      <span class="chg-badge {change.kind}" title={change.label}>{change.code}</span>
+    {/if}
   </div>
 {/if}
 

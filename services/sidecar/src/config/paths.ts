@@ -26,7 +26,15 @@ export const userConfigPath = path.join(runtimeDir, "config.json");
 
 export const worktreesDir = path.join(runtimeDir, "worktrees");
 
+export const memoryDir = path.join(runtimeDir, "memory");
+
+const workspaceKey = (workspace: string): string =>
+  createHash("sha1").update(workspace).digest("hex").slice(0, 16);
+
 export function journalPath(workspace: string): string {
-  const key = createHash("sha1").update(workspace).digest("hex").slice(0, 16);
-  return path.join(eventsDir, `${key}.jsonl`);
+  return path.join(eventsDir, `${workspaceKey(workspace)}.jsonl`);
+}
+
+export function memoryPath(workspace: string): string {
+  return path.join(memoryDir, `${workspaceKey(workspace)}.json`);
 }

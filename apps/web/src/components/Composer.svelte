@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import type { FileNode } from "@orchestrator/contracts";
-  import { Sparkles, Plug, Paperclip, X } from "@lucide/svelte";
+  import { Sparkles, Plug, Paperclip, X, Bot } from "@lucide/svelte";
   import { session } from "../lib/session.svelte";
   import { fileGlyph } from "../lib/icons";
+  import { agentSlug } from "../lib/mentions";
   import ModelPicker from "./ModelPicker.svelte";
 
   type Item = {
@@ -43,19 +44,21 @@
 
   const mcp = $derived((session.config?.mcp ?? []).filter((s) => s.enabled));
   const skills = $derived((session.config?.skills ?? []).filter((s) => s.enabled));
+  const agents = $derived(session.threads.filter((t) => t.kind !== "orchestrator"));
 
   const token = $derived.by(() => {
     if (dismissed) return null;
     const before = text.slice(0, cursor);
     const at = before.lastIndexOf("@");
     const slash = before.lastIndexOf("/");
-    const idx = Math.max(at, slash);
+    const dollar = before.lastIndexOf("$");
+    const idx = Math.max(at, slash, dollar);
     if (idx < 0) return null;
     const ch = before[idx]!;
     if (idx > 0 && !/\s/.test(before[idx - 1]!)) return null;
     const query = before.slice(idx + 1);
     if (/\s/.test(query)) return null;
-    return { trigger: ch as "@" | "/", query, start: idx };
+    return { trigger: ch as "@" | "/" | "$", query, start: idx };
   });
 
   const items: Item[] = $derived.by(() => {
@@ -74,6 +77,19 @@
           group: "Files",
           search: f.path.toLowerCase(),
           path: f.path,
+        }));
+    }
+    if (t.trigger === "$") {
+      return agents
+        .filter((a) => !q || a.title.toLowerCase().includes(q))
+        .slice(0, 50)
+        .map((a) => ({
+          id: `agent:${a.id}`,
+          label: a.title,
+          hint: `${a.status} · ${a.harness}`,
+          insert: `$${agentSlug(a.title)} `,
+          group: "Agents",
+          search: `agent ${a.title}`.toLowerCase(),
         }));
     }
     const out: Item[] = [];
@@ -271,7 +287,7 @@
           {#if i === 0 || items[i - 1]!.group !== item.group}
             <div class="menu-head">{item.group}</div>
           {/if}
-          {@const Glyph = item.path ? fileGlyph(item.label) : item.group === "MCP servers" ? Plug : Sparkles}
+          {@const Glyph = item.path ? fileGlyph(item.label) : item.group === "MCP servers" ? Plug : item.group === "Agents" ? Bot : Sparkles}
           <button
             type="button"
             class="menu-row"
@@ -326,7 +342,7 @@
       </button>
       <ModelPicker />
       <span class="hint">
-        <b>@</b> files · <b>/</b> skills · <b>/mcp</b>
+        <b>$</b> agents · <b>@</b> files · <b>/</b> skills · <b>/mcp</b>
       </span>
       <button class="send" disabled={!canSend} title="Send" onclick={() => void send()}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>

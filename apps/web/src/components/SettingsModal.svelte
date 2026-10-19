@@ -91,10 +91,6 @@
                 </div>
                 <div class="detail">{h.detail}</div>
               </div>
-              <label class="switch">
-                <input type="checkbox" checked={h.enabled} onchange={(e) => onToggle("harness", h.id, e.currentTarget.checked)} />
-                <span class="slider"></span>
-              </label>
             </div>
             {#if h.id === "antigravity" && session.antigravity}
               <div class="test-panel">
@@ -178,19 +174,13 @@
           {/each}
         {:else if session.settingsSection === "skills"}
           <h3>Skills</h3>
-          <div class="sub">
-            {(session.config?.skills ?? []).filter((s) => s.enabled).length} of {(session.config?.skills ?? []).length} enabled. Enabled skills are injected as the agent system prompt.
-          </div>
+          <div class="sub">Enabled skills are injected as the agent system prompt.</div>
           {#each session.config?.skills ?? [] as s (s.name)}
             <div class="srow">
               <div class="grow">
                 <div class="name">{s.name}</div>
                 <div class="detail">{s.description || s.path}</div>
               </div>
-              <label class="switch">
-                <input type="checkbox" checked={s.enabled} onchange={(e) => onToggle("skill", s.name, e.currentTarget.checked)} />
-                <span class="slider"></span>
-              </label>
             </div>
           {/each}
         {:else}

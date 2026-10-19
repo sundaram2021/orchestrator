@@ -67,8 +67,7 @@ test("captures worktree, prompt and parent on thread.started", () => {
   assert.equal(thread?.parentId, "t1");
 });
 
-test("projects token/context usage onto the thread", () => {
-  const rm = new ReadModel(config);
+test("projects token/context usage onto the thread", () => {  const rm = new ReadModel(config);
   rm.apply({ seq: 0, ts: 0, event: { type: "thread.started", threadId: "t1", title: "a", harness: "opencode", model: "m" } });
   rm.apply({
     seq: 1,
@@ -83,4 +82,20 @@ test("projects token/context usage onto the thread", () => {
   assert.equal(usage?.input, 1200);
   assert.equal(usage?.output, 340);
   assert.equal(usage?.contextLimit, 200000);
+});
+
+test("tracks unread until the thread is marked read", () => {
+  const rm = new ReadModel(config);
+  rm.apply({ seq: 0, ts: 0, event: { type: "thread.started", threadId: "t1", title: "a", harness: "opencode", model: "m" } });
+  assert.equal(rm.snapshot().threads[0]?.unread ?? false, false);
+
+  rm.apply({ seq: 1, ts: 0, event: { type: "thread.unread", threadId: "t1" } });
+  assert.equal(rm.snapshot().threads[0]?.unread, true);
+
+  rm.apply({ seq: 2, ts: 0, event: { type: "thread.read", threadId: "t1" } });
+  assert.equal(rm.snapshot().threads[0]?.unread, false);
+
+  rm.apply({ seq: 3, ts: 0, event: { type: "thread.removed", threadId: "t1" } });
+  rm.apply({ seq: 4, ts: 0, event: { type: "thread.read", threadId: "t1" } });
+  assert.equal(rm.snapshot().threads.length, 0);
 });

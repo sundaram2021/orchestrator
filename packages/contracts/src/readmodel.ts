@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { AgentStatusSchema, MessageRoleSchema, UsageSchema } from "./events.js";
+import {
+  AgentStatusSchema,
+  MessageRoleSchema,
+  MessageSourceSchema,
+  ThreadKindSchema,
+  UsageSchema,
+} from "./events.js";
 import { AttachmentMetaSchema } from "./attachments.js";
 import { AppConfigSchema } from "./config.js";
 
@@ -18,6 +24,7 @@ export const MessageViewSchema = z.object({
   id: z.string(),
   role: MessageRoleSchema,
   text: z.string(),
+  source: MessageSourceSchema.optional(),
   reasoning: z.string().optional(),
   tools: z.array(ToolViewSchema),
 });
@@ -28,7 +35,9 @@ export const ThreadViewSchema = z.object({
   title: z.string(),
   harness: z.string(),
   model: z.string(),
+  kind: ThreadKindSchema.optional(),
   status: AgentStatusSchema,
+  unread: z.boolean().optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
   messages: z.array(MessageViewSchema),

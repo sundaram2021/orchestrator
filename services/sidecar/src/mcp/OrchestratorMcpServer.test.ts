@@ -52,6 +52,16 @@ const makeStub = (): { api: OrchestratorApi; threads: Map<string, ThreadView> } 
       }
       return thread;
     },
+    async sendMessage(id, text) {
+      const thread = threads.get(id);
+      if (!thread) throw new Error(`thread ${id} not found`);
+      thread.status = "running";
+      thread.messages.push({ id: `m${thread.messages.length + 1}`, role: "user", text, tools: [] });
+    },
+    memoryWrite: (text) => `Saved memory note: ${text}`,
+    memorySearch: (query) => `matches for ${query}`,
+    memoryList: () => "note list",
+    agentRegistry: () => "registry",
   };
   return { api, threads };
 };
@@ -68,6 +78,11 @@ test("tools/list exposes the orchestrator toolset", () => {
     "thread_read",
     "thread_wait",
     "thread_interrupt",
+    "send_message",
+    "memory_write",
+    "memory_search",
+    "memory_list",
+    "agent_registry",
   ]) {
     assert.ok(names.includes(expected), `missing ${expected}`);
   }
@@ -123,7 +138,7 @@ test("create_thread spawns a thread and returns its id", async () => {
 test("delegate_task with wait blocks and returns the result", async () => {
   const { api } = makeStub();
   const text = await callOrchestratorTool(api, "delegate_task", { prompt: "say pong", wait: true, parent_id: "th_parent" });
-  assert.match(text, /status: done/);
+  assert.match(text, /finished/);
   assert.match(text, /PONG/);
 });
 
@@ -131,6 +146,27 @@ test("delegate_task without wait returns immediately", async () => {
   const { api } = makeStub();
   const text = await callOrchestratorTool(api, "delegate_task", { prompt: "background" });
   assert.match(text, /Delegated task/);
+});
+
+test("send_message delivers an instruction to an existing thread", async () => {
+  const { api, threads } = makeStub();
+  await callOrchestratorTool(api, "create_thread", { prompt: "child" });
+  const text = await callOrchestratorTool(api, "send_message", { thread_id: "th_1", text: "do more" });
+  assert.match(text, /Sent instruction to thread th_1/);
+  const messages = threads.get("th_1")?.messages ?? [];
+  assert.ok(messages.some((m) => m.role === "user" && m.text === "do more"));
+});
+
+test("send_message on a missing thread reports an error", async () => {
+  const { api } = makeStub();
+  const reply = await handleMcpMessage(api, {
+    jsonrpc: "2.0",
+    id: 5,
+    method: "tools/call",
+    params: { name: "send_message", arguments: { thread_id: "th_nope", text: "hi" } },
+  });
+  const result = reply?.result as { isError?: boolean };
+  assert.equal(result.isError, true);
 });
 
 test("task_status on a missing thread reports an error", async () => {

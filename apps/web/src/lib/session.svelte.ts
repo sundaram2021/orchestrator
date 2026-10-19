@@ -13,7 +13,7 @@ import type {
 } from "@orchestrator/contracts";
 import { RpcClient, type ConnState } from "./rpc";
 
-type EditorView = "code" | "diff" | "markdown";
+type EditorView = "code" | "diff";
 export type SettingsSection = "harnesses" | "mcp" | "skills" | "updates";
 
 const uid = (): string =>
@@ -54,14 +54,15 @@ class Session {
   connection = $state<ConnState>("connecting");
   view = $state<"chat" | "editor">("chat");
   showRight = $state(true);
-  rightTab = $state<"files" | "changes">("changes");
   favorites = $state<string[]>([]);
   activeThreadId = $state<string | null>(null);
   editorView = $state<EditorView>("code");
+  mdPreview = $state(false);
   settingsOpen = $state(false);
   settingsSection = $state<SettingsSection>("harnesses");
 
   tree = $state<FileNode[]>([]);
+  chatTabs = $state<string[]>([]);
   openTabs = $state<string[]>([]);
   activeFile = $state<string | null>(null);
   fileContents = $state<Record<string, string>>({});
@@ -114,7 +115,13 @@ class Session {
       this.threads = snapshot.threads;
       this.config = snapshot.config;
       this.lastSeq = snapshot.lastSeq;
-      if (!this.activeThreadId && this.threads[0]) this.activeThreadId = this.threads[0].id;
+      if (!this.activeThreadId) {
+        this.activeThreadId = this.orchestrator?.id ?? this.threads[0]?.id ?? null;
+      }
+      const orchestrator = this.orchestrator;
+      if (orchestrator && !this.chatTabs.includes(orchestrator.id)) {
+        this.chatTabs = [orchestrator.id, ...this.chatTabs];
+      }
       this.client.resume();
       void this.refreshTree();
       void this.refreshGit();
@@ -126,14 +133,18 @@ class Session {
 
   private ensureActive(): void {
     if (this.activeThreadId && !this.threads.some((t) => t.id === this.activeThreadId)) {
-      this.activeThreadId = this.threads[this.threads.length - 1]?.id ?? null;
+      this.activeThreadId = this.orchestrator?.id ?? this.threads[this.threads.length - 1]?.id ?? null;
     } else if (!this.activeThreadId && this.threads[0]) {
-      this.activeThreadId = this.threads[0].id;
+      this.activeThreadId = this.orchestrator?.id ?? this.threads[0].id;
     }
   }
 
   private findThread(id: string): ThreadView | undefined {
     return this.threads.find((t) => t.id === id);
+  }
+
+  get orchestrator(): ThreadView | undefined {
+    return this.threads.find((t) => t.kind === "orchestrator");
   }
 
   private applyEvent(event: DomainEvent): void {
@@ -149,10 +160,11 @@ class Session {
           title: e.title,
           harness: e.harness,
           model: e.model,
-          status: "running",
+          status: e.kind === "orchestrator" ? "idle" : "running",
           createdAt: now,
           updatedAt: now,
           messages: [],
+          ...(e.kind ? { kind: e.kind } : {}),
           ...(e.prompt ? { prompt: e.prompt } : {}),
           ...(e.branch ? { branch: e.branch } : {}),
           ...(e.worktree ? { worktree: e.worktree } : {}),
@@ -160,6 +172,9 @@ class Session {
           ...(e.attachments ? { attachments: e.attachments } : {}),
         });
         if (!this.activeThreadId) this.activeThreadId = e.threadId;
+        if (e.kind === "orchestrator" && !this.chatTabs.includes(e.threadId)) {
+          this.chatTabs = [e.threadId, ...this.chatTabs];
+        }
         break;
       }
       case "agent.status": {
@@ -167,9 +182,28 @@ class Session {
         if (t) t.status = e.status;
         break;
       }
+      case "thread.unread": {
+        const t = this.findThread(e.threadId);
+        if (t) t.unread = true;
+        if (this.isWatching(e.threadId)) void this.markRead(e.threadId);
+        break;
+      }
+      case "thread.read": {
+        const t = this.findThread(e.threadId);
+        if (t) t.unread = false;
+        break;
+      }
       case "message.appended": {
         const t = this.findThread(e.threadId);
-        if (t) t.messages.push({ id: e.messageId, role: e.role, text: e.text, tools: [] });
+        if (t) {
+          t.messages.push({
+            id: e.messageId,
+            role: e.role,
+            text: e.text,
+            tools: [],
+            ...(e.source ? { source: e.source } : {}),
+          });
+        }
         break;
       }
       case "message.delta": {
@@ -220,6 +254,7 @@ class Session {
       }
       case "thread.removed": {
         this.threads = this.threads.filter((t) => t.id !== e.threadId);
+        this.chatTabs = this.chatTabs.filter((t) => t !== e.threadId);
         const checkpoints = { ...this.checkpoints };
         delete checkpoints[e.threadId];
         this.checkpoints = checkpoints;
@@ -263,8 +298,19 @@ class Session {
   async send(prompt: string, attachments?: Attachment[]): Promise<void> {
     const text = prompt.trim();
     if (!text || !this.config) return;
-    const { harness, id } = this.config.model;
     this.view = "chat";
+    const orchestrator = this.orchestrator;
+    if (orchestrator) {
+      this.activeThreadId = orchestrator.id;
+      await this.client.request("dispatchCommand", {
+        kind: "SendMessage",
+        threadId: orchestrator.id,
+        text,
+        ...(attachments?.length ? { attachments } : {}),
+      });
+      return;
+    }
+    const { harness, id } = this.config.model;
     await this.client.request("dispatchCommand", {
       kind: "StartThread",
       prompt: text,
@@ -328,20 +374,6 @@ class Session {
     this.showRight = !this.showRight;
   }
 
-  setRightTab(tab: "files" | "changes"): void {
-    this.rightTab = tab;
-    this.showRight = true;
-  }
-
-  toggleRightTab(tab: "files" | "changes"): void {
-    if (this.showRight && this.rightTab === tab) {
-      this.showRight = false;
-    } else {
-      this.rightTab = tab;
-      this.showRight = true;
-    }
-  }
-
   toggleFavorite(id: string): void {
     this.favorites = this.favorites.includes(id)
       ? this.favorites.filter((f) => f !== id)
@@ -349,12 +381,42 @@ class Session {
   }
 
   selectThread(id: string): void {
+    this.openConversation(id);
+  }
+
+  isWatching(id: string): boolean {
+    return (
+      this.activeThreadId === id &&
+      this.view === "chat" &&
+      (typeof document === "undefined" || document.hasFocus())
+    );
+  }
+
+  async markRead(threadId: string): Promise<void> {
+    const thread = this.findThread(threadId);
+    if (!thread?.unread) return;
+    await this.client.request("dispatchCommand", { kind: "MarkRead", threadId });
+  }
+
+  openConversation(id: string): void {
+    if (!this.chatTabs.includes(id)) this.chatTabs = [...this.chatTabs, id];
     this.activeThreadId = id;
     this.view = "chat";
+    void this.markRead(id);
+  }
+
+  closeConversation(id: string): void {
+    if (this.findThread(id)?.kind === "orchestrator") return;
+    this.chatTabs = this.chatTabs.filter((t) => t !== id);
+    if (this.activeThreadId === id) {
+      this.activeThreadId = this.chatTabs[this.chatTabs.length - 1] ?? this.orchestrator?.id ?? null;
+      this.view = "chat";
+    }
   }
 
   newAgent(): void {
-    this.activeThreadId = null;
+    const orchestrator = this.orchestrator;
+    if (orchestrator) this.openConversation(orchestrator.id);
     this.view = "chat";
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("orchestrator:focus-composer"));
@@ -362,7 +424,8 @@ class Session {
   }
 
   suggest(text: string): void {
-    this.activeThreadId = null;
+    const orchestrator = this.orchestrator;
+    if (orchestrator) this.openConversation(orchestrator.id);
     this.view = "chat";
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("orchestrator:set-composer", { detail: text }));

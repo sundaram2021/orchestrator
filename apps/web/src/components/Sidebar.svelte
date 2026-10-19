@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ThreadView } from "@orchestrator/contracts";
-  import { Folder, Plus, Search, MoreHorizontal, Trash2 } from "@lucide/svelte";
+  import { Folder, Plus, Search, MoreHorizontal, Trash2, CornerDownRight } from "@lucide/svelte";
   import { session, harnessOf, harnessName, runningCount } from "../lib/session.svelte";
   import { relTime, statusLabel } from "../lib/time";
   import ProviderIcon from "./ProviderIcon.svelte";
@@ -8,15 +8,35 @@
 
   let q = $state("");
   const clearAll = async (): Promise<void> => {
-    if (!session.threads.length) return;
+    if (!session.threads.some((t) => t.kind !== "orchestrator")) return;
     if (!confirm("Remove all chats from the sidebar? Running agents will be stopped.")) return;
     await session.clearAll();
   };
   const filtered = $derived(
-    session.threads.filter((t) => !q || t.title.toLowerCase().includes(q.toLowerCase())),
+    session.threads.filter(
+      (t) => t.kind !== "orchestrator" && (!q || t.title.toLowerCase().includes(q.toLowerCase())),
+    ),
   );
-  const running = $derived(filtered.filter((t) => t.status === "running"));
-  const done = $derived(filtered.filter((t) => t.status !== "running"));
+  const known = $derived(new Set(filtered.map((t) => t.id)));
+  const childrenOf = $derived.by(() => {
+    const map = new Map<string, ThreadView[]>();
+    for (const t of filtered) {
+      if (!t.parentId || !known.has(t.parentId)) continue;
+      const list = map.get(t.parentId) ?? [];
+      list.push(t);
+      map.set(t.parentId, list);
+    }
+    return map;
+  });
+  const roots = $derived(filtered.filter((t) => !t.parentId || !known.has(t.parentId)));
+  const subtreeRunning = (t: ThreadView): boolean =>
+    t.status === "running" || (childrenOf.get(t.id) ?? []).some(subtreeRunning);
+  const groups = $derived.by(() => {
+    const running: ThreadView[] = [];
+    const done: ThreadView[] = [];
+    for (const root of roots) (subtreeRunning(root) ? running : done).push(root);
+    return { running, done };
+  });
   const wsName = $derived(
     session.config?.workspace
       ? (session.config.workspace.split(/[\\/]/).filter(Boolean).pop() ?? "")
@@ -72,7 +92,7 @@
     <div class="search-wrap">
       <span class="search-ic"><Search size={13} /></span>
       <input class="search has-ic" bind:value={q} placeholder="Search agents…" />
-      {#if session.threads.length}
+      {#if session.threads.some((t) => t.kind !== "orchestrator")}
         <button class="clearbtn" title="Clear all chats" aria-label="Clear all chats" onclick={clearAll}>
           <Trash2 size={13} />
         </button>
@@ -84,13 +104,13 @@
     {#if filtered.length === 0}
       <div class="empty" style="padding:8px">{q ? "No matches." : "No agents yet."}</div>
     {:else}
-      {#if running.length}
+      {#if groups.running.length}
         <div class="hgroup">Running</div>
-        {#each running as t (t.id)}{@render card(t)}{/each}
+        {#each groups.running as t (t.id)}{@render node(t, 0)}{/each}
       {/if}
-      {#if done.length}
+      {#if groups.done.length}
         <div class="hgroup">History</div>
-        {#each done as t (t.id)}{@render card(t)}{/each}
+        {#each groups.done as t (t.id)}{@render node(t, 0)}{/each}
       {/if}
     {/if}
   </div>
@@ -108,22 +128,37 @@
   </div>
 {/if}
 
-{#snippet card(t: ThreadView)}
+{#snippet node(t: ThreadView, depth: number)}
+  {@render card(t, depth)}
+  {#each childrenOf.get(t.id) ?? [] as child (child.id)}
+    {@render node(child, depth + 1)}
+  {/each}
+{/snippet}
+
+{#snippet card(t: ThreadView, depth: number)}
   <div
     class="tcard"
+    class:sub={depth > 0}
     class:active={t.id === session.activeThreadId}
     class:menuing={t.id === menuFor}
+    style={depth > 0 ? `margin-left:${depth * 14}px;width:calc(100% - ${depth * 14}px)` : ""}
     role="button"
     tabindex="0"
     onclick={() => session.selectThread(t.id)}
     onkeydown={(e) => e.key === "Enter" && session.selectThread(t.id)}
   >
     <span class="trow">
+      {#if depth > 0}
+        <span class="kicon" title="Sub-agent"><CornerDownRight size={13} /></span>
+      {/if}
       <span class="t" title={t.title}>{t.title}</span>
+      {#if t.unread}<span class="tunread" title="Unread output"></span>{/if}
       <span class="tstat {dotClass(t.status)}">{statusLabel(t.status)}</span>
-      <button class="tmenu" title="Session options" onclick={(e) => openMenu(e, t.id)}>
-        <MoreHorizontal size={15} />
-      </button>
+      {#if t.kind !== "orchestrator"}
+        <button class="tmenu" title="Session options" onclick={(e) => openMenu(e, t.id)}>
+          <MoreHorizontal size={15} />
+        </button>
+      {/if}
     </span>
     {#if snippet(t)}<span class="tsnip">{snippet(t)}</span>{/if}
     <span class="m">
@@ -132,6 +167,7 @@
       <span class="txt">{harnessName(t.harness)}</span>
       <span class="mdot">·</span>
       <span class="txt">{relTime(t.updatedAt)}</span>
+      {#if t.parentId}<span class="mdot">·</span><span class="txt">sub-agent</span>{/if}
     </span>
   </div>
 {/snippet}
@@ -174,6 +210,24 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+  .kicon {
+    display: grid;
+    place-items: center;
+    color: var(--faint);
+    flex-shrink: 0;
+  }
+  .tunread {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .tcard.sub {
+    border-left-color: var(--border-soft);
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
   }
   .trow .t {
     flex: 1;

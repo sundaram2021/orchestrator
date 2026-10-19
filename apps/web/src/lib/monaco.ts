@@ -47,6 +47,10 @@ monaco.editor.defineTheme("orchestrator-dark", {
     "editorLineNumber.activeForeground": "#7c7c88",
     "editor.selectionBackground": "#26406f",
     "editorCursor.foreground": "#3d6ef5",
+    "scrollbar.shadow": "#00000000",
+    "scrollbarSlider.background": "#ffffff1f",
+    "scrollbarSlider.hoverBackground": "#ffffff2e",
+    "scrollbarSlider.activeBackground": "#ffffff3d",
   },
 });
 

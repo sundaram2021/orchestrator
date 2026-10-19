@@ -20,6 +20,13 @@ export const CommandSchema = z.discriminatedUnion("kind", [
     attachments: z.array(AttachmentSchema).optional(),
   }),
   z.object({ kind: z.literal("StopAgent"), threadId: z.string() }),
+  z.object({ kind: z.literal("MarkRead"), threadId: z.string() }),
+  z.object({
+    kind: z.literal("SendMessage"),
+    threadId: z.string(),
+    text: z.string().min(1),
+    attachments: z.array(AttachmentSchema).optional(),
+  }),
   z.object({ kind: z.literal("RetryThread"), threadId: z.string(), model: z.string().optional() }),
   z.object({ kind: z.literal("ForkThread"), threadId: z.string() }),
   z.object({ kind: z.literal("DiscardThread"), threadId: z.string() }),

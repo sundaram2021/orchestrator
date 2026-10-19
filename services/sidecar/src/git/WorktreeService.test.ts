@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { WorktreeService } from "./WorktreeService.js";
@@ -76,5 +76,49 @@ test("restore resets tracked files and drops untracked ones", async () => {
     assert.equal(existsSync(path.join(dir, "untracked.txt")), false);
   } finally {
     cleanup(dir);
+  }
+});
+
+test("remove deletes the worktree directory and its branch", async () => {
+  const repo = makeRepo();
+  const root = mkdtempSync(path.join(os.tmpdir(), "orch-wt-root-"));
+  try {
+    const wt = new WorktreeService(repo, root);
+    const handle = await wt.create("th_keep-0001");
+    assert.ok(handle);
+    assert.equal(existsSync(handle.dir), true);
+    assert.deepEqual(wt.list(), ["th_keep-0001"]);
+
+    await wt.remove(handle);
+    assert.equal(existsSync(handle.dir), false);
+    assert.equal(run(repo, ["branch", "--list", "orch/*"]).trim(), "");
+  } finally {
+    cleanup(root);
+    cleanup(repo);
+  }
+});
+
+test("sweep removes orphan worktrees and unregistered directories", async () => {
+  const repo = makeRepo();
+  const root = mkdtempSync(path.join(os.tmpdir(), "orch-wt-root-"));
+  try {
+    const wt = new WorktreeService(repo, root);
+    const keep = await wt.create("th_keep-0001");
+    const drop = await wt.create("th_drop-0002");
+    assert.ok(keep?.dir && drop?.dir);
+    const stale = path.join(root, "th_stale-0003");
+    mkdirSync(stale);
+
+    const removed = await wt.sweep(["th_keep-0001"]);
+    assert.deepEqual(removed.sort(), ["th_drop-0002", "th_stale-0003"]);
+    assert.equal(existsSync(keep.dir), true);
+    assert.equal(existsSync(drop.dir), false);
+    assert.equal(existsSync(stale), false);
+    assert.deepEqual(wt.list(), ["th_keep-0001"]);
+
+    await wt.remove(keep);
+  } finally {
+    cleanup(root);
+    cleanup(repo);
   }
 });

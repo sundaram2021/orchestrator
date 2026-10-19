@@ -36,10 +36,11 @@ export class ReadModel {
           title: e.title,
           harness: e.harness,
           model: e.model,
-          status: "running",
+          status: e.kind === "orchestrator" ? "idle" : "running",
           createdAt: now,
           updatedAt: now,
           messages: [],
+          ...(e.kind ? { kind: e.kind } : {}),
           ...(e.prompt ? { prompt: e.prompt } : {}),
           ...(e.branch ? { branch: e.branch } : {}),
           ...(e.worktree ? { worktree: e.worktree } : {}),
@@ -56,10 +57,26 @@ export class ReadModel {
         }
         break;
       }
+      case "thread.unread": {
+        const t = this.threads.get(e.threadId);
+        if (t) t.unread = true;
+        break;
+      }
+      case "thread.read": {
+        const t = this.threads.get(e.threadId);
+        if (t) t.unread = false;
+        break;
+      }
       case "message.appended": {
         const t = this.threads.get(e.threadId);
         if (t) {
-          t.messages.push({ id: e.messageId, role: e.role, text: e.text, tools: [] });
+          t.messages.push({
+            id: e.messageId,
+            role: e.role,
+            text: e.text,
+            tools: [],
+            ...(e.source ? { source: e.source } : {}),
+          });
           this.touch(t);
         }
         break;

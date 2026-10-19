@@ -4,6 +4,12 @@ import { AppConfigSchema, HarnessStatusSchema, McpStatusSchema } from "./config.
 
 export const MessageRoleSchema = z.enum(["user", "assistant", "system"]);
 
+export const ThreadKindSchema = z.enum(["orchestrator", "agent"]);
+export type ThreadKind = z.infer<typeof ThreadKindSchema>;
+
+export const MessageSourceSchema = z.enum(["user", "orchestrator"]);
+export type MessageSource = z.infer<typeof MessageSourceSchema>;
+
 export const UsageSchema = z.object({
   input: z.number(),
   output: z.number(),
@@ -16,7 +22,7 @@ export const UsageSchema = z.object({
 });
 export type Usage = z.infer<typeof UsageSchema>;
 
-export const AgentStatusSchema = z.enum(["running", "stopped", "done", "error"]);
+export const AgentStatusSchema = z.enum(["idle", "running", "stopped", "done", "error"]);
 
 export const ThreadStartedSchema = z.object({
   type: z.literal("thread.started"),
@@ -24,6 +30,7 @@ export const ThreadStartedSchema = z.object({
   title: z.string(),
   harness: z.string(),
   model: z.string(),
+  kind: ThreadKindSchema.optional(),
   prompt: z.string().optional(),
   branch: z.string().optional(),
   worktree: z.string().optional(),
@@ -37,12 +44,23 @@ export const AgentStatusChangedSchema = z.object({
   status: AgentStatusSchema,
 });
 
+export const ThreadUnreadSchema = z.object({
+  type: z.literal("thread.unread"),
+  threadId: z.string(),
+});
+
+export const ThreadReadSchema = z.object({
+  type: z.literal("thread.read"),
+  threadId: z.string(),
+});
+
 export const MessageAppendedSchema = z.object({
   type: z.literal("message.appended"),
   threadId: z.string(),
   messageId: z.string(),
   role: MessageRoleSchema,
   text: z.string(),
+  source: MessageSourceSchema.optional(),
 });
 
 export const MessageDeltaSchema = z.object({
@@ -118,6 +136,8 @@ export const McpStatusChangedSchema = z.object({
 export const EventBodySchema = z.discriminatedUnion("type", [
   ThreadStartedSchema,
   AgentStatusChangedSchema,
+  ThreadUnreadSchema,
+  ThreadReadSchema,
   MessageAppendedSchema,
   MessageDeltaSchema,
   MessageReasoningSchema,

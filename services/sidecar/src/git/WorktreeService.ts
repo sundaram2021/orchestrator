@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import type { Checkpoint } from "@orchestrator/contracts";
 import { runCapture } from "../util/process.js";
@@ -11,10 +11,28 @@ export interface WorktreeHandle {
 }
 
 export class WorktreeService {
-  constructor(private readonly workspace: string) {}
+  constructor(
+    private readonly workspace: string,
+    private readonly root = worktreesDir,
+  ) {}
 
   private dir(threadId: string): string {
-    return path.join(worktreesDir, threadId.replace(/[^A-Za-z0-9_-]/g, ""));
+    return path.join(this.root, threadId.replace(/[^A-Za-z0-9_-]/g, ""));
+  }
+
+  handle(threadId: string): WorktreeHandle {
+    const short = threadId.replace(/[^A-Za-z0-9]/g, "").slice(-8) || "agent";
+    return { dir: this.dir(threadId), branch: `orch/${short}` };
+  }
+
+  list(): string[] {
+    try {
+      return readdirSync(this.root, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && entry.name.startsWith("th_"))
+        .map((entry) => entry.name);
+    } catch {
+      return [];
+    }
   }
 
   async create(threadId: string): Promise<WorktreeHandle | null> {
@@ -23,11 +41,9 @@ export class WorktreeService {
     const head = await runCapture("git", ["rev-parse", "--verify", "HEAD"], { cwd: this.workspace });
     if (head.failed) return null;
 
-    const short = threadId.replace(/[^A-Za-z0-9]/g, "").slice(-8) || "agent";
-    const branch = `orch/${short}`;
-    const dir = this.dir(threadId);
+    const { branch, dir } = this.handle(threadId);
     try {
-      mkdirSync(worktreesDir, { recursive: true });
+      mkdirSync(this.root, { recursive: true });
     } catch {
       /* directory may already exist */
     }
@@ -39,8 +55,33 @@ export class WorktreeService {
   }
 
   async remove(handle: WorktreeHandle): Promise<void> {
-    await runCapture("git", ["worktree", "remove", "--force", handle.dir], { cwd: this.workspace });
+    const res = await runCapture("git", ["worktree", "remove", "--force", handle.dir], {
+      cwd: this.workspace,
+    });
+    if (res.failed) {
+      try {
+        rmSync(handle.dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch {
+        /* best effort */
+      }
+    }
     await runCapture("git", ["branch", "-D", handle.branch], { cwd: this.workspace });
+  }
+
+  async sweep(activeThreadIds: Iterable<string>): Promise<string[]> {
+    const alive = new Set([...activeThreadIds].map((id) => id.replace(/[^A-Za-z0-9_-]/g, "")));
+    const removed: string[] = [];
+    for (const name of this.list()) {
+      if (alive.has(name)) continue;
+      await this.remove(this.handle(name));
+      removed.push(name);
+    }
+    await this.prune();
+    return removed;
+  }
+
+  async prune(): Promise<void> {
+    await runCapture("git", ["worktree", "prune"], { cwd: this.workspace });
   }
 
   async merge(branch: string): Promise<{ ok: boolean; output: string }> {

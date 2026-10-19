@@ -64,7 +64,8 @@ export const ORCHESTRATOR_TOOLS: McpToolDef[] = [
   },
   {
     name: "task_status",
-    description: "Read a thread's status, model, branch, message count and latest assistant result.",
+    description:
+      "Check what a thread is doing right now (or what it finished with). Returns a short plain-language description.",
     inputSchema: obj({ thread_id: threadIdProp }, ["thread_id"]),
   },
   {
@@ -104,6 +105,52 @@ export const ORCHESTRATOR_TOOLS: McpToolDef[] = [
     description: "Interrupt the active turn of a thread (alias of task_cancel).",
     inputSchema: obj({ thread_id: threadIdProp }, ["thread_id"]),
   },
+  {
+    name: "send_message",
+    description:
+      "Send a follow-up instruction to an existing agent thread and start it working. Use this to give further instructions to a child agent, or to answer something it asked.",
+    inputSchema: obj(
+      {
+        thread_id: threadIdProp,
+        text: { type: "string", description: "The instruction to deliver to the agent." },
+      },
+      ["thread_id", "text"],
+    ),
+  },
+  {
+    name: "memory_write",
+    description:
+      "Save a durable fact, user preference, architectural decision or important agent detail to orchestrator memory. Use tags to group entries.",
+    inputSchema: obj(
+      {
+        text: { type: "string", description: "The fact to remember, written concisely." },
+        tags: { type: "array", items: { type: "string" }, description: "Optional tags for retrieval." },
+      },
+      ["text"],
+    ),
+  },
+  {
+    name: "memory_search",
+    description: "Search orchestrator memory notes by text or tag.",
+    inputSchema: obj(
+      {
+        query: { type: "string", description: "Text or tag to search for." },
+        limit: { type: "number", description: "Max notes to return (default 10)." },
+      },
+      ["query"],
+    ),
+  },
+  {
+    name: "memory_list",
+    description: "List the most recent orchestrator memory notes.",
+    inputSchema: obj({ limit: { type: "number", description: "Max notes (default 40)." } }),
+  },
+  {
+    name: "agent_registry",
+    description:
+      "List every agent thread (running or not) with id, status, title, lineage and latest assistant result.",
+    inputSchema: obj({}),
+  },
 ];
 
 export interface OrchestratorApi {
@@ -121,6 +168,11 @@ export interface OrchestratorApi {
   listThreadViews(): ThreadView[];
   interrupt(threadId: string): Promise<void>;
   awaitThread(threadId: string, timeoutMs?: number): Promise<ThreadView | undefined>;
+  sendMessage(threadId: string, text: string): Promise<void>;
+  memoryWrite(text: string, tags?: string[]): string;
+  memorySearch(query: string, limit?: number): string;
+  memoryList(limit?: number): string;
+  agentRegistry(): string;
 }
 
 interface JsonRpcRequest {
@@ -161,17 +213,19 @@ const requirePrompt = (args: Record<string, unknown>): string => {
 
 const summarize = (thread: ThreadView): string => {
   const last = [...thread.messages].reverse().find((m) => m.role === "assistant" && m.text.trim());
-  const lines = [
-    `Thread ${thread.id}`,
-    `title: ${thread.title}`,
-    `status: ${thread.status}`,
-    `model: ${thread.harness}/${thread.model}`,
-  ];
-  if (thread.parentId) lines.push(`parent: ${thread.parentId}`);
-  if (thread.branch) lines.push(`branch: ${thread.branch}`);
-  lines.push(`messages: ${thread.messages.length}`);
-  if (last?.text.trim()) lines.push("", "last assistant:", last.text.trim().slice(0, 4000));
-  return lines.join("\n");
+  const pending = [...thread.messages]
+    .reverse()
+    .flatMap((m) => [...m.tools].reverse())
+    .find((tool) => tool.ok === undefined);
+  if (thread.status === "running") {
+    if (pending) return `"${thread.title}" is running and currently using ${pending.tool}.`;
+    return `"${thread.title}" is running and working on its task.`;
+  }
+  if (thread.status === "error") return `"${thread.title}" hit an error and stopped.`;
+  if (thread.status === "stopped") return `"${thread.title}" was stopped before finishing.`;
+  return last
+    ? `"${thread.title}" finished. ${last.text.trim().slice(0, 4000)}`
+    : `"${thread.title}" finished without producing any output.`;
 };
 
 const readThread = (thread: ThreadView, view: string): string => {
@@ -269,6 +323,37 @@ export async function callOrchestratorTool(
       await api.interrupt(threadId);
       return `Interrupted thread ${threadId}.`;
     }
+
+    case "send_message": {
+      const threadId = requireThreadId(args);
+      const text = strArg(args, "text");
+      if (!text) throw new Error("text is required");
+      const view = api.threadView(threadId);
+      if (!view) throw new Error(`thread ${threadId} not found`);
+      await api.sendMessage(threadId, text);
+      return `Sent instruction to thread ${threadId} (${view.title}).`;
+    }
+
+    case "memory_write": {
+      const text = strArg(args, "text");
+      if (!text) throw new Error("text is required");
+      const tags = Array.isArray(args.tags)
+        ? args.tags.filter((tag): tag is string => typeof tag === "string" && tag.trim() !== "")
+        : [];
+      return api.memoryWrite(text, tags);
+    }
+
+    case "memory_search": {
+      const query = strArg(args, "query");
+      if (!query) throw new Error("query is required");
+      return api.memorySearch(query, numArg(args, "limit") ?? 10);
+    }
+
+    case "memory_list":
+      return api.memoryList(numArg(args, "limit") ?? 40);
+
+    case "agent_registry":
+      return api.agentRegistry();
 
     default:
       throw new Error(`unknown tool: ${name}`);
