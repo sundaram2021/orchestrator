@@ -1,0 +1,71 @@
+apps/web/src/app.css
+  s_0dc3da93d59c81::t_28bb94698136b9 1294,1296-1307,1311-1314,1316-1319,1324,1327,1329-1355,1364,1366-1376,1379-1395,1399-1463
+  s_0dc3da93d59c81::t_aee58bd3d450da 239-242
+  s_0dc3da93d59c81::t_1030bebae3e3fd 957,965,968,972,979,987,995,998,1001
+apps/web/src/lib/session.svelte.ts
+  s_0dc3da93d59c81::t_33f2e3eca153ba 38
+  s_0dc3da93d59c81::t_a55e6fcdc1871f 440-441,443-445,447-448
+  s_0dc3da93d59c81::t_c75edec3484268 24-37,39-41
+apps/web/src/components/ModelPicker.svelte
+  s_0dc3da93d59c81::t_73ebb4fe840079 101
+apps/web/src/components/Message.svelte
+  s_0dc3da93d59c81::t_a6210e2f83a308 118-121
+  s_0dc3da93d59c81::t_e3b65d169dea4b 177,180,182,186-190,193,195-200,203-206
+  s_0dc3da93d59c81::t_ad928ec31eb855 30-41,44-48
+  s_0dc3da93d59c81::t_a126d296f84c83 9-13,19-28
+  s_0dc3da93d59c81::t_6c401aa4c6eca8 61-65,69-73
+  s_0dc3da93d59c81::t_f7769c6f38fd10 3-4
+  s_0dc3da93d59c81::t_1b7e10b63e249f 92-104
+  s_0dc3da93d59c81::t_51d953b36f485f 29
+services/sidecar/src/index.ts
+  s_0dc3da93d59c81::t_d9b40f6e904dc3 17
+  s_0dc3da93d59c81::t_4c7a0fe8782811 66-67,70
+apps/web/src/components/ChatView.svelte
+  s_0dc3da93d59c81::t_27571fa958b868 49-50,53-55,64
+  s_0dc3da93d59c81::t_9240d8e4c9da8e 118-123
+  s_0dc3da93d59c81::t_2254d48604e08b 2,4
+apps/web/src/components/ToolCall.svelte
+  s_0dc3da93d59c81::t_0ef2cd547a7c88 170
+  s_0dc3da93d59c81::t_f7a6481c5c0709 103,110,116-117,136,140-141,153-154,163
+  s_0dc3da93d59c81::t_1e80bc64fd1112 5,31-32
+  s_0dc3da93d59c81::t_dbe56f641ce05b 234
+  s_0dc3da93d59c81::t_db6dd00f124a07 6-16,35-42,61-62,65-95,192-197,200-206,208-223,225-233,235-249,251-252,254-256,259-262,264-268,270
+  s_0dc3da93d59c81::t_cd22fdaac378e0 29
+  s_0dc3da93d59c81::t_100150faaf962d 132
+  s_0dc3da93d59c81::t_ba69bd91044051 3
+  s_0dc3da93d59c81::t_f2147c02c50f92 48-49,55,58-59
+  s_0dc3da93d59c81::t_847d48d080e4d7 18
+  s_0dc3da93d59c81::t_8f466927aa4c88 45
+  s_0dc3da93d59c81::t_647a3471862af6 56-57
+  s_0dc3da93d59c81::t_0f0a1d47ff03e6 34
+  s_0dc3da93d59c81::t_c6e5cb5aee322e 60
+apps/web/src/components/MarkdownPreview.svelte
+  s_0dc3da93d59c81::t_480501c90568ce 2-3,5,7,12-18,21-38
+apps/web/src/lib/tools.ts
+  s_0dc3da93d59c81::t_a9d7088997274c 166-282
+apps/web/src/components/Sidebar.svelte
+  s_0dc3da93d59c81::t_b8b8aefab2a866 72-80
+  s_0dc3da93d59c81::t_359c2caa9498a3 140-144,147-149,154-155,159
+apps/web/src/lib/time.ts
+  s_0dc3da93d59c81::t_a3c9b58a77d4aa 22-30
+services/sidecar/src/files/FilesService.ts
+  s_0dc3da93d59c81::t_d2bbb19d6d0e93 22,28-32,35-37
+apps/web/src/lib/markdown.ts
+  s_0dc3da93d59c81::t_c7df61e37b588f 1-190
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "71314d91aea0691c02821e42ab85f5442e13482e",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
