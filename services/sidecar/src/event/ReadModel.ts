@@ -76,6 +76,8 @@ export class ReadModel {
             text: e.text,
             tools: [],
             ...(e.source ? { source: e.source } : {}),
+            ...(e.level ? { level: e.level } : {}),
+            ...(e.details ? { details: e.details } : {}),
           });
           this.touch(t);
         }
@@ -122,6 +124,7 @@ export class ReadModel {
               tool.ok = e.ok;
               tool.result = e.result;
               tool.endedAt = event.ts;
+              if (e.truncated) tool.truncated = true;
               break;
             }
           }
@@ -133,7 +136,7 @@ export class ReadModel {
         const t = this.threads.get(e.threadId);
         if (t) {
           t.status = "error";
-          t.messages.push({ id: uid("m"), role: "system", text: e.message, tools: [] });
+          t.messages.push({ id: uid("m"), role: "system", text: e.message, level: "error", tools: [] });
           this.touch(t);
         }
         break;

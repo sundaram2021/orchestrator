@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AgentStatusSchema,
+  MessageLevelSchema,
   MessageRoleSchema,
   MessageSourceSchema,
   ThreadKindSchema,
@@ -15,6 +16,7 @@ export const ToolViewSchema = z.object({
   args: z.string(),
   ok: z.boolean().optional(),
   result: z.string().optional(),
+  truncated: z.boolean().optional(),
   startedAt: z.number().int().optional(),
   endedAt: z.number().int().optional(),
 });
@@ -26,6 +28,8 @@ export const MessageViewSchema = z.object({
   text: z.string(),
   source: MessageSourceSchema.optional(),
   reasoning: z.string().optional(),
+  level: MessageLevelSchema.optional(),
+  details: z.string().optional(),
   tools: z.array(ToolViewSchema),
 });
 export type MessageView = z.infer<typeof MessageViewSchema>;

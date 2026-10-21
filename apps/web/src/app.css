@@ -1592,6 +1592,12 @@ svg {
   color: var(--amber);
   border-color: rgba(224, 177, 95, 0.4);
 }
+.mcp-error {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--amber) 78%, var(--muted));
+}
 .switch {
   position: relative;
   width: 36px;

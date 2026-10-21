@@ -4,6 +4,7 @@ import { connectHttp, connectStdio, type McpConnection } from "./McpClient.js";
 import { OpenCodeMcpBridge, type OpenCodeMcpEntry } from "./OpenCodeMcpBridge.js";
 import { SettingsStore } from "../config/SettingsStore.js";
 import { logger } from "../util/logger.js";
+import { errMessage } from "../util/coerce.js";
 
 const log = logger("mcp");
 
@@ -47,9 +48,11 @@ export class McpManager {
     return this.servers.find((s) => s.config.name === name);
   }
 
-  private update(config: McpServerConfig, status: McpStatus, tools?: string[]): void {
+  private update(config: McpServerConfig, status: McpStatus, tools?: string[], error?: string): void {
     config.status = status;
     if (tools) config.tools = tools;
+    if (error) config.error = error;
+    else delete config.error;
     for (const listener of this.listeners) listener(config);
   }
 
@@ -90,7 +93,7 @@ export class McpManager {
     } catch (err) {
       this.connections.get(name)?.close();
       this.connections.delete(name);
-      this.update(server.config, "error", []);
+      this.update(server.config, "error", [], errMessage(err));
       log.warn(`${name} connection failed`, err instanceof Error ? err.message : err);
     }
     return server.config;

@@ -12,6 +12,7 @@ import type {
   ThreadView,
 } from "@orchestrator/contracts";
 import { RpcClient, type ConnState } from "./rpc";
+import { explainError, firstLine } from "./errorHints";
 
 type EditorView = "code" | "diff";
 export type SettingsSection = "harnesses" | "mcp" | "skills" | "updates";
@@ -202,6 +203,8 @@ class Session {
             text: e.text,
             tools: [],
             ...(e.source ? { source: e.source } : {}),
+            ...(e.level ? { level: e.level } : {}),
+            ...(e.details ? { details: e.details } : {}),
           });
         }
         break;
@@ -239,6 +242,7 @@ class Session {
             tool.ok = e.ok;
             tool.result = e.result;
             tool.endedAt = event.ts;
+            if (e.truncated) tool.truncated = true;
             break;
           }
         }
@@ -248,7 +252,7 @@ class Session {
         const t = this.findThread(e.threadId);
         if (t) {
           t.status = "error";
-          t.messages.push({ id: uid(), role: "system", text: e.message, tools: [] });
+          t.messages.push({ id: uid(), role: "system", text: e.message, level: "error", tools: [] });
         }
         break;
       }
@@ -293,6 +297,12 @@ class Session {
     setTimeout(() => {
       if (this.toast === text) this.toast = null;
     }, 3200);
+  }
+
+  private notifyError(err: unknown): void {
+    const raw = err instanceof Error ? err.message : String(err);
+    const explanation = explainError(raw);
+    this.notify(`${explanation.title} — ${explanation.hint}`);
   }
 
   async send(prompt: string, attachments?: Attachment[]): Promise<void> {
@@ -455,7 +465,7 @@ class Session {
       await this.refreshTree();
       await this.refreshGit();
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -473,7 +483,7 @@ class Session {
       await this.refreshTree();
       await this.refreshGit();
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -484,7 +494,7 @@ class Session {
       await this.refreshTree();
       await this.refreshGit();
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -514,7 +524,7 @@ class Session {
       this.editorView = "code";
       this.view = "editor";
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -545,7 +555,7 @@ class Session {
       this.notify(`Saved ${path}`);
       await this.refreshGit();
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -575,7 +585,7 @@ class Session {
       const result = await this.client.request("gitDiff", params);
       this.diff = result.diff;
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -604,7 +614,11 @@ class Session {
   async checkout(branch: string): Promise<void> {
     if (branch === this.git?.branch) return;
     const result = await this.client.request("gitCheckout", { branch });
-    this.notify(result.ok ? `Switched to ${branch}` : result.output || "Checkout failed");
+    this.notify(
+      result.ok
+        ? `Switched to ${branch}`
+        : `Could not switch branch — ${firstLine(result.output) || "unknown error"}`,
+    );
     if (result.ok) await this.refreshGit();
   }
 
@@ -612,7 +626,11 @@ class Session {
     const title = this.prTitle.trim() || `Orchestrator: ${this.git?.branch ?? "changes"}`;
     const body = this.prBody.trim();
     const result = await this.client.request("gitCreatePr", body ? { title, body } : { title });
-    this.notify(result.ok ? result.output || "Pull request created" : result.output || "PR failed");
+    this.notify(
+      result.ok
+        ? firstLine(result.output) || "Pull request created"
+        : `Pull request failed — ${firstLine(result.output) || "unknown error"}`,
+    );
   }
 
   async loadCheckpoints(threadId: string): Promise<void> {
@@ -625,14 +643,22 @@ class Session {
 
   async createCheckpoint(threadId: string): Promise<void> {
     const result = await this.client.request("createCheckpoint", { threadId });
-    this.notify(result.ok ? `Checkpoint ${result.sha}` : result.output || "Checkpoint failed");
+    this.notify(
+      result.ok
+        ? `Checkpoint ${result.sha.slice(0, 7)} saved`
+        : `Checkpoint failed — ${firstLine(result.output) || "unknown error"}`,
+    );
     await this.loadCheckpoints(threadId);
   }
 
   async restoreCheckpoint(threadId: string, sha: string): Promise<void> {
     if (!confirm(`Restore this agent's worktree to ${sha}? Later changes will be discarded.`)) return;
     const result = await this.client.request("restoreCheckpoint", { threadId, sha });
-    this.notify(result.ok ? `Restored to ${sha}` : result.output || "Restore failed");
+    this.notify(
+      result.ok
+        ? `Restored to ${sha.slice(0, 7)}`
+        : `Restore failed — ${firstLine(result.output) || "unknown error"}`,
+    );
     await this.loadCheckpoints(threadId);
   }
 
@@ -641,13 +667,17 @@ class Session {
       "landThread",
       title && title.trim() ? { threadId, title: title.trim() } : { threadId },
     );
-    this.notify(result.ok ? result.output || "Pull request opened" : result.output || "Landing failed");
+    this.notify(
+      result.ok
+        ? firstLine(result.output) || "Pull request opened"
+        : `Landing failed — ${firstLine(result.output) || "unknown error"}`,
+    );
     await this.loadCheckpoints(threadId);
   }
 
   async push(): Promise<void> {
     const result = await this.client.request("gitPush");
-    this.notify(result.ok ? "Pushed" : result.output || "Push failed");
+    this.notify(result.ok ? "Pushed" : `Push failed — ${firstLine(result.output) || "unknown error"}`);
     await this.refreshGit();
   }
 
@@ -655,7 +685,7 @@ class Session {
     const message = this.commitMessage.trim();
     if (!message) return;
     const result = await this.client.request("gitCommit", { message });
-    this.notify(result.ok ? "Committed" : result.output || "Commit failed");
+    this.notify(result.ok ? "Committed" : `Commit failed — ${firstLine(result.output) || "unknown error"}`);
     if (result.ok) this.commitMessage = "";
     await this.refreshGit();
   }
@@ -665,12 +695,12 @@ class Session {
     if (!message) return;
     const committed = await this.client.request("gitCommit", { message });
     if (!committed.ok) {
-      this.notify(committed.output || "Commit failed");
+      this.notify(`Commit failed — ${firstLine(committed.output) || "unknown error"}`);
       return;
     }
     this.commitMessage = "";
     const pushed = await this.client.request("gitPush");
-    this.notify(pushed.ok ? "Committed & pushed" : pushed.output || "Push failed");
+    this.notify(pushed.ok ? "Committed & pushed" : `Push failed — ${firstLine(pushed.output) || "unknown error"}`);
     await this.refreshGit();
   }
 
@@ -678,7 +708,7 @@ class Session {
     try {
       this.antigravity = await this.client.request("antigravityStatus");
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -688,7 +718,7 @@ class Session {
       this.antigravity = await this.client.request("installAntigravity");
       this.notify("Antigravity agent installed");
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -699,7 +729,7 @@ class Session {
       this.antigravityAuthUrl = result.url;
       this.notify("Open the sign-in link to authenticate with Google.");
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -709,7 +739,7 @@ class Session {
       this.notify(result.ok ? "Antigravity signed in" : "Sign-in callback failed");
       await this.refreshAntigravity();
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 
@@ -737,7 +767,7 @@ class Session {
       this.client.setUrl(url);
       this.notify(`Workspace: ${selected}`);
     } catch (err) {
-      this.notify(err instanceof Error ? err.message : String(err));
+      this.notifyError(err);
     }
   }
 }

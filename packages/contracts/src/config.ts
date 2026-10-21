@@ -43,6 +43,7 @@ export const McpServerConfigSchema = z.object({
   transport: z.enum(["stdio", "sse", "http"]),
   source: z.string(),
   detail: z.string(),
+  error: z.string().optional(),
   tools: z.array(z.string()),
   status: McpStatusSchema,
   enabled: z.boolean(),

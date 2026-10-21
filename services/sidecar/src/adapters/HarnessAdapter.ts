@@ -11,7 +11,7 @@ export type ProviderEvent =
   | { kind: "assistant"; text: string }
   | { kind: "reasoning"; text: string }
   | { kind: "tool"; callId: string; tool: string; args: string }
-  | { kind: "toolResult"; callId: string; ok: boolean; result: string }
+  | { kind: "toolResult"; callId: string; ok: boolean; result: string; truncated?: boolean }
   | { kind: "usage"; usage: Usage }
   | { kind: "done" }
   | { kind: "error"; message: string };

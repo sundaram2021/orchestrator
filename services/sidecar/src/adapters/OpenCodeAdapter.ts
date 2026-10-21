@@ -5,6 +5,7 @@ import type { HarnessStatus, ModelDescriptor, Usage } from "@orchestrator/contra
 import { killTree, runCapture, spawnStream } from "../util/process.js";
 import { uid } from "../util/ids.js";
 import { logger } from "../util/logger.js";
+import { cleanToolText } from "../util/text.js";
 import { parseOpenCodeModels } from "../models/catalog.js";
 import { openCodeBridgeConfig } from "../config/paths.js";
 import { OpenCodeServer, type ServerEvent, type ServerModel } from "./OpenCodeServer.js";
@@ -135,11 +136,13 @@ export function parseRunLine(line: string): ProviderEvent[] {
     const input = state.input ? JSON.stringify(state.input) : "{}";
     out.push({ kind: "tool", callId, tool, args: input });
     if (state.status === "completed" || typeof state.output === "string") {
+      const output = cleanToolText(String(state.output ?? ""));
       out.push({
         kind: "toolResult",
         callId,
         ok: state.status !== "error",
-        result: String(state.output ?? "").slice(0, 4000),
+        result: output.text,
+        ...(output.truncated ? { truncated: true } : {}),
       });
     }
     return out;
@@ -432,11 +435,13 @@ export class OpenCodeAdapter implements HarnessAdapter {
                 }
                 if ((state.status === "completed" || state.status === "error") && toolState.get(callId) !== "done") {
                   toolState.set(callId, "done");
+                  const output = cleanToolText(String(state.output ?? ""));
                   yield {
                     kind: "toolResult",
                     callId,
                     ok: state.status !== "error",
-                    result: String(state.output ?? "").slice(0, 4000),
+                    result: output.text,
+                    ...(output.truncated ? { truncated: true } : {}),
                   };
                 }
               }

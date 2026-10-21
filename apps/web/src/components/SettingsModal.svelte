@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Blocks, Plug, Sparkles, Download, ExternalLink } from "@lucide/svelte";
   import { session, type SettingsSection } from "../lib/session.svelte";
+  import { explainError } from "../lib/errorHints";
   import ProviderIcon from "./ProviderIcon.svelte";
 
   const sections: Array<{ id: SettingsSection; label: string; icon: typeof Blocks }> = [
@@ -52,6 +53,14 @@
       testResult = err instanceof Error ? err.message : String(err);
     } finally {
       testBusy = false;
+    }
+  };
+
+  const prettyResult = (text: string): string => {
+    try {
+      return JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      return text;
     }
   };
 </script>
@@ -138,6 +147,7 @@
             {(session.config?.mcp ?? []).filter((s) => s.enabled).length} of {(session.config?.mcp ?? []).length} enabled.
           </div>
           {#each session.config?.mcp ?? [] as s (s.name)}
+            {@const mcpError = s.status === "error" && s.error ? explainError(s.error) : null}
             <div class="srow">
               <div class="grow">
                 <div class="name">
@@ -145,6 +155,9 @@
                   <span class="badge" class:ok={s.status === "connected"} class:warn={s.status === "error"}>{s.status}</span>
                 </div>
                 <div class="detail">{s.transport} · {s.source} · {s.detail}{s.tools.length ? ` · ${s.tools.length} tools` : ""}</div>
+                {#if mcpError}
+                  <div class="mcp-error">{mcpError.title} — {mcpError.hint}</div>
+                {/if}
               </div>
               {#if s.status === "connected"}
                 <button class="btn" onclick={() => toggleTest(s.name)}>Test</button>
@@ -167,7 +180,7 @@
                   <button class="btn" disabled={testBusy || !testToolName.trim()} onclick={() => void runTest(s.name)}>Run tool</button>
                 </div>
                 {#if testResult !== null}
-                  <pre class="test-out">{testResult}</pre>
+                  <pre class="test-out">{prettyResult(testResult)}</pre>
                 {/if}
               </div>
             {/if}

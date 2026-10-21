@@ -10,6 +10,9 @@ export type ThreadKind = z.infer<typeof ThreadKindSchema>;
 export const MessageSourceSchema = z.enum(["user", "orchestrator"]);
 export type MessageSource = z.infer<typeof MessageSourceSchema>;
 
+export const MessageLevelSchema = z.enum(["info", "warning", "error"]);
+export type MessageLevel = z.infer<typeof MessageLevelSchema>;
+
 export const UsageSchema = z.object({
   input: z.number(),
   output: z.number(),
@@ -61,6 +64,8 @@ export const MessageAppendedSchema = z.object({
   role: MessageRoleSchema,
   text: z.string(),
   source: MessageSourceSchema.optional(),
+  level: MessageLevelSchema.optional(),
+  details: z.string().optional(),
 });
 
 export const MessageDeltaSchema = z.object({
@@ -91,6 +96,7 @@ export const ToolResultSchema = z.object({
   callId: z.string(),
   ok: z.boolean(),
   result: z.string(),
+  truncated: z.boolean().optional(),
 });
 
 export const TurnCompletedSchema = z.object({
