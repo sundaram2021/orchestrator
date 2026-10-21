@@ -4,6 +4,7 @@ import type { AntigravityStatus, HarnessStatus, ModelDescriptor, Usage } from "@
 import { runtimeDir } from "../config/paths.js";
 import { uid } from "../util/ids.js";
 import { logger } from "../util/logger.js";
+import { cleanToolText } from "../util/text.js";
 import { AcpClient, type AcpNotification } from "../antigravity/AcpClient.js";
 import {
   ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE,
@@ -437,6 +438,33 @@ function pathToFileUrl(filePath: string): string {
   return normalized.startsWith("/") ? `file://${normalized}` : `file:///${normalized}`;
 }
 
+const canonicalToolName = (title: string): string => {
+  const trimmed = title.trim().replace(/^running\s+/i, "");
+  if (
+    /^(get|set|new|remove|invoke|select|where|start|stop|test|write|read|copy|move|rename|out|import|export)-/i.test(trimmed) ||
+    /^(git|pnpm|npm|npx|node|python|pip|cargo|dotnet|go|make|bash|sh|zsh|cmd|powershell|pwsh)\b/i.test(trimmed)
+  ) {
+    return "run_command";
+  }
+  return trimmed.replace(/\s+/g, "_").toLowerCase();
+};
+
+const contentText = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(contentText).filter(Boolean).join("\n");
+  if (!value || typeof value !== "object") return "";
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.text === "string") return obj.text;
+  if (obj.content !== undefined) return contentText(obj.content);
+  if (obj.parts !== undefined) return contentText(obj.parts);
+  return "";
+};
+
+const toolOutput = (shaped: Record<string, unknown>): string => {
+  if (typeof shaped.rawOutput === "string" && shaped.rawOutput.trim()) return shaped.rawOutput;
+  return contentText(shaped.content);
+};
+
 function mapUpdate(
   params: Record<string, unknown>,
   toolState: Map<string, "open" | "done">,
@@ -463,16 +491,18 @@ function mapUpdate(
       toolState.set(callId, "open");
       const title = typeof shaped.title === "string" ? shaped.title : "tool";
       const args = shaped.rawInput ? JSON.stringify(shaped.rawInput) : "{}";
-      events.push({ kind: "tool", callId, tool: title, args });
+      events.push({ kind: "tool", callId, tool: canonicalToolName(title), args });
     }
     const status = shaped.status;
     if ((status === "completed" || status === "failed") && toolState.get(callId) !== "done") {
       toolState.set(callId, "done");
+      const output = cleanToolText(toolOutput(shaped));
       events.push({
         kind: "toolResult",
         callId,
         ok: status !== "failed",
-        result: typeof shaped.rawOutput === "string" ? shaped.rawOutput.slice(0, 4000) : "",
+        result: output.text,
+        ...(output.truncated ? { truncated: true } : {}),
       });
     }
     return events;
@@ -484,12 +514,14 @@ function mapUpdate(
       return [];
     }
     toolState.set(callId, "done");
+    const output = cleanToolText(toolOutput(shaped));
     return [
       {
         kind: "toolResult",
         callId,
         ok: status !== "failed",
-        result: typeof shaped.rawOutput === "string" ? shaped.rawOutput.slice(0, 4000) : "",
+        result: output.text,
+        ...(output.truncated ? { truncated: true } : {}),
       },
     ];
   }

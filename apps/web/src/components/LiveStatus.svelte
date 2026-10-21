@@ -3,7 +3,8 @@
   import type { ThreadView } from "@orchestrator/contracts";
   import { Square } from "@lucide/svelte";
   import { session } from "../lib/session.svelte";
-  import { toolActivity, toolSummary, matchMcpServer, mcpLeaf } from "../lib/tools";
+  import { matchMcpServer, mcpLeaf } from "../lib/tools";
+  import { describeTool } from "../lib/toolPresentation";
 
   let { thread }: { thread: ThreadView } = $props();
 
@@ -18,9 +19,13 @@
   const pendingTool = $derived(lastAssistant?.tools.find((t) => t.ok === undefined));
   const toolCount = $derived(thread.messages.reduce((n, m) => n + m.tools.length, 0));
 
+  const presentation = $derived(
+    pendingTool ? describeTool(pendingTool, { threads: session.threads, servers }) : null,
+  );
+
   const activity = $derived(
-    pendingTool
-      ? toolActivity(pendingTool.tool)
+    presentation
+      ? presentation.action
       : lastAssistant?.text?.trim()
         ? "Composing response"
         : "Thinking",
@@ -28,15 +33,15 @@
 
   const detail = $derived.by(() => {
     if (pendingTool) {
+      const p = describeTool(pendingTool, { threads: session.threads, servers });
       const s = matchMcpServer(pendingTool.tool, servers);
-      const target = toolSummary(pendingTool.tool, pendingTool.args);
       const leaf = s ? mcpLeaf(pendingTool.tool, s) : "";
-      return [s, leaf, target].filter(Boolean).join(" · ");
+      return [s, leaf, p.target].filter(Boolean).join(" · ");
     }
     const r = lastAssistant?.reasoning?.trim();
     if (!r || lastAssistant?.text?.trim()) return "";
-    const oneLine = r.replace(/\s+/g, " ");
-    return oneLine.length > 180 ? `…${oneLine.slice(-180)}` : oneLine;
+    const oneLine = r.replace(/\s+/g, " ").trim();
+    return oneLine.length > 180 ? `${oneLine.slice(0, 179)}…` : oneLine;
   });
 
   const elapsed = $derived.by(() => {

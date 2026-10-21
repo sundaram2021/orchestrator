@@ -76,7 +76,7 @@ export const ORCHESTRATOR_TOOLS: McpToolDef[] = [
   {
     name: "thread_list",
     description: "List threads, newest first, with id, status and title.",
-    inputSchema: obj({ limit: { type: "number", description: "Max rows (default 50)." } }),
+    inputSchema: obj({ limit: { type: "number", description: "Max rows (default 30)." } }),
   },
   {
     name: "thread_read",
@@ -143,7 +143,7 @@ export const ORCHESTRATOR_TOOLS: McpToolDef[] = [
   {
     name: "memory_list",
     description: "List the most recent orchestrator memory notes.",
-    inputSchema: obj({ limit: { type: "number", description: "Max notes (default 40)." } }),
+    inputSchema: obj({ limit: { type: "number", description: "Max notes (default 20)." } }),
   },
   {
     name: "agent_registry",
@@ -218,30 +218,102 @@ const summarize = (thread: ThreadView): string => {
     .flatMap((m) => [...m.tools].reverse())
     .find((tool) => tool.ok === undefined);
   if (thread.status === "running") {
-    if (pending) return `"${thread.title}" is running and currently using ${pending.tool}.`;
+    if (pending) return `"${thread.title}" is running and currently using ${humanTool(pending.tool)}.`;
     return `"${thread.title}" is running and working on its task.`;
   }
   if (thread.status === "error") return `"${thread.title}" hit an error and stopped.`;
   if (thread.status === "stopped") return `"${thread.title}" was stopped before finishing.`;
   return last
-    ? `"${thread.title}" finished. ${last.text.trim().slice(0, 4000)}`
+    ? `"${thread.title}" finished. ${last.text.trim().slice(0, 1500)}`
     : `"${thread.title}" finished without producing any output.`;
 };
 
-const readThread = (thread: ThreadView, view: string): string => {
-  const lines = [`Thread ${thread.id} — ${thread.title} [${thread.status}]`];
-  for (const message of thread.messages) {
-    if (view === "activity") {
-      if (message.reasoning?.trim()) lines.push(`\n[reasoning] ${message.reasoning.trim().slice(0, 1500)}`);
-      if (message.text.trim()) lines.push(`\n${message.role}: ${message.text.trim().slice(0, 2500)}`);
-      for (const tool of message.tools) {
-        lines.push(`  · tool ${tool.tool}${tool.ok === false ? " (failed)" : tool.ok === true ? " (ok)" : " (pending)"}`);
-      }
-    } else if (message.text.trim()) {
-      lines.push(`\n${message.role}: ${message.text.trim().slice(0, 2500)}`);
+const KNOWN_TOOLS: Record<string, string> = {
+  run_command: "a command",
+  read_file: "a file",
+  write_file: "a file",
+  edit_file: "a file",
+  list_dir: "a folder",
+  list_files: "a folder",
+  grep: "a code search",
+  glob: "a file search",
+  webfetch: "a web page",
+  websearch: "the web",
+  task: "a sub-agent",
+  todowrite: "its task list",
+  browser: "the browser",
+  skill: "a skill",
+};
+
+const humanTool = (name: string): string => {
+  const known = KNOWN_TOOLS[name];
+  if (known) return known;
+  const leaf = name.includes("__") ? (name.split("__").pop() ?? name) : (name.split("/").pop() ?? name);
+  return leaf.replace(/[_-]+/g, " ");
+};
+
+const brief = (text: string, max = 100): string => {
+  const one = text.replace(/\s+/g, " ").trim();
+  return one.length > max ? `${one.slice(0, max - 1)}…` : one;
+};
+
+const toolArgBrief = (args: string): string => {
+  try {
+    const value = JSON.parse(args) as Record<string, unknown>;
+    for (const key of [
+      "command_line",
+      "command",
+      "cmd",
+      "file_path",
+      "path",
+      "AbsolutePath",
+      "pattern",
+      "query",
+      "url",
+      "task",
+      "text",
+    ]) {
+      const item = value[key];
+      if (typeof item === "string" && item.trim()) return brief(item);
     }
+  } catch {
+    /* args are not JSON */
+  }
+  return "";
+};
+
+const formatCapabilities = (cap: ReturnType<OrchestratorApi["capabilities"]>): string => {
+  const lines = [`Default model: ${cap.model.name} (${cap.model.harness} / ${cap.model.id})`];
+  for (const harness of cap.harnesses) {
+    lines.push("", `${harness.name} (${harness.id})`);
+    if (!harness.models.length) lines.push("  (no models)");
+    for (const model of harness.models) lines.push(`  • ${model.name} — ${model.id}`);
   }
   return lines.join("\n");
+};
+
+const MAX_READ_MESSAGES = 30;
+const MAX_READ_CHARS = 12_000;
+
+const readThread = (thread: ThreadView, view: string): string => {
+  const header = `Thread "${thread.title}" [${thread.status}] (id ${thread.id})`;
+  const lines: string[] = [];
+  for (const message of thread.messages.slice(-MAX_READ_MESSAGES)) {
+    if (view === "activity") {
+      if (message.reasoning?.trim()) lines.push(`\n[reasoning] ${message.reasoning.trim().slice(0, 800)}`);
+      if (message.text.trim()) lines.push(`\n${message.role}: ${message.text.trim().slice(0, 1800)}`);
+      for (const tool of message.tools) {
+        const arg = toolArgBrief(tool.args);
+        const state = tool.ok === false ? "failed" : tool.ok === true ? "ok" : "pending";
+        lines.push(`  · ${humanTool(tool.tool)}${arg ? `: ${arg}` : ""} — ${state}`);
+      }
+    } else if (message.text.trim()) {
+      lines.push(`\n${message.role}: ${message.text.trim().slice(0, 1800)}`);
+    }
+  }
+  const body = lines.join("\n");
+  if (body.length <= MAX_READ_CHARS) return `${header}${body}`;
+  return `${header}\n… (older output trimmed)\n${body.slice(-(MAX_READ_CHARS - header.length - 32))}`;
 };
 
 export async function callOrchestratorTool(
@@ -251,7 +323,7 @@ export async function callOrchestratorTool(
 ): Promise<string> {
   switch (name) {
     case "capabilities":
-      return JSON.stringify(api.capabilities(), null, 2);
+      return formatCapabilities(api.capabilities());
 
     case "create_thread": {
       const prompt = requirePrompt(args);
@@ -307,11 +379,15 @@ export async function callOrchestratorTool(
     }
 
     case "thread_list": {
-      const limit = numArg(args, "limit") ?? 50;
+      const limit = numArg(args, "limit") ?? 30;
       const threads = api.listThreadViews();
-      const rows = threads.slice(0, Math.max(0, limit)).map(
-        (t) => `${t.id}  [${t.status}]  ${t.title}${t.parentId ? `  (parent ${t.parentId})` : ""}`,
-      );
+      const titles = new Map(threads.map((thread) => [thread.id, thread.title]));
+      const rows = threads.slice(0, Math.max(0, limit)).map((thread) => {
+        const parent = thread.parentId
+          ? ` — child of "${titles.get(thread.parentId) ?? "another agent"}"`
+          : "";
+        return `${thread.title} [${thread.status}]${parent}\n  id: ${thread.id}`;
+      });
       return rows.length ? rows.join("\n") : "No threads.";
     }
 
@@ -350,7 +426,7 @@ export async function callOrchestratorTool(
     }
 
     case "memory_list":
-      return api.memoryList(numArg(args, "limit") ?? 40);
+      return api.memoryList(numArg(args, "limit") ?? 20);
 
     case "agent_registry":
       return api.agentRegistry();

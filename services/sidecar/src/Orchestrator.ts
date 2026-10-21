@@ -7,8 +7,10 @@ import type {
   DomainEvent,
   EventBody,
   ModelRef,
+  MessageLevel,
   ReadModel as ReadModelData,
   ThreadView,
+  Usage,
 } from "@orchestrator/contracts";
 import { mkdir, writeFile } from "node:fs/promises";
 import { errMessage } from "./util/coerce.js";
@@ -60,6 +62,7 @@ interface Run {
   persistent: boolean;
   stopped: boolean;
   busy: boolean;
+  lastUsage?: Usage;
 }
 
 export interface OrchestratorDeps {
@@ -116,7 +119,13 @@ export class Orchestrator {
     }
     this.ensureOrchestrator();
     this.deps.mcp.subscribe((server) => {
-      this.emit({ type: "mcp.status", name: server.name, status: server.status, tools: server.tools });
+      this.emit({
+        type: "mcp.status",
+        name: server.name,
+        status: server.status,
+        tools: server.tools,
+        ...(server.schemaChars !== undefined ? { schemaChars: server.schemaChars } : {}),
+      });
     });
     void this.deps.mcp.connectEnabled();
     log.info("orchestrator initialised");
@@ -212,13 +221,11 @@ export class Orchestrator {
     if (!thread?.worktree) return { ok: false, sha: "", output: "This thread has no isolated worktree." };
     const message = label?.trim() || `checkpoint ${new Date().toISOString()}`;
     const res = await this.deps.worktrees.checkpoint(thread.worktree, message);
-    this.emit({
-      type: "message.appended",
+    this.system(
       threadId,
-      messageId: uid("m"),
-      role: "system",
-      text: res.ok ? `Checkpoint ${res.sha}: ${message}` : `Checkpoint failed: ${res.output}`,
-    });
+      res.ok ? `Checkpoint ${res.sha.slice(0, 7)} saved` : "Checkpoint failed",
+      res.ok ? { details: message } : { level: "warning", details: res.output },
+    );
     return res;
   }
 
@@ -226,13 +233,11 @@ export class Orchestrator {
     const thread = this.findThread(threadId);
     if (!thread?.worktree) return { ok: false, output: "This thread has no isolated worktree." };
     const res = await this.deps.worktrees.restore(thread.worktree, sha);
-    this.emit({
-      type: "message.appended",
+    this.system(
       threadId,
-      messageId: uid("m"),
-      role: "system",
-      text: res.ok ? `Restored worktree to ${sha}.` : `Restore failed: ${res.output}`,
-    });
+      res.ok ? `Restored worktree to ${sha.slice(0, 7)}.` : "Restore failed",
+      res.ok ? {} : { level: "warning", details: res.output },
+    );
     return res;
   }
 
@@ -247,12 +252,12 @@ export class Orchestrator {
     const title = options.title?.trim() || thread.title;
     const commit = await this.deps.worktrees.checkpoint(thread.worktree, title);
     if (!commit.ok) {
-      this.system(threadId, `Commit failed: ${commit.output}`);
+      this.system(threadId, "Commit failed", { level: "warning", details: commit.output });
       return { ok: false, output: commit.output };
     }
     const push = await this.deps.worktrees.push(thread.worktree, thread.branch);
     if (!push.ok) {
-      this.system(threadId, `Push failed: ${push.output}`);
+      this.system(threadId, "Push failed", { level: "warning", details: push.output });
       return { ok: false, output: push.output };
     }
     const pr = await this.deps.worktrees.createPullRequest(thread.worktree, {
@@ -260,12 +265,34 @@ export class Orchestrator {
       body: options.body,
       base: options.base,
     });
-    this.system(threadId, pr.ok ? `Pull request: ${pr.output}` : `Pushed, but no PR: ${pr.output}`);
+    const url = /https?:\/\/\S+/.exec(pr.output)?.[0];
+    this.system(
+      threadId,
+      pr.ok
+        ? url
+          ? `Pull request created: ${url}`
+          : "Pull request created"
+        : "Pushed, but no pull request was created",
+      { level: pr.ok ? "info" : "warning", details: pr.output },
+    );
     return pr;
   }
 
-  private system(threadId: string, text: string): void {
-    this.emit({ type: "message.appended", threadId, messageId: uid("m"), role: "system", text });
+  private system(
+    threadId: string,
+    text: string,
+    opts: { level?: MessageLevel; details?: string } = {},
+  ): void {
+    const details = opts.details?.trim();
+    this.emit({
+      type: "message.appended",
+      threadId,
+      messageId: uid("m"),
+      role: "system",
+      text,
+      ...(opts.level ? { level: opts.level } : {}),
+      ...(details ? { details } : {}),
+    });
   }
 
   async handle(command: Command): Promise<{ accepted: true }> {
@@ -306,6 +333,10 @@ export class Orchestrator {
         break;
       case "SetEnabled":
         await this.setEnabled(command.target, command.id, command.enabled);
+        break;
+      case "SetMcpRoute":
+        this.deps.mcp.setRoute(command.name, command.route);
+        await this.publishConfig();
         break;
       case "SetUpdateSettings":
         this.deps.config.setUpdateSettings({
@@ -358,12 +389,13 @@ export class Orchestrator {
       return;
     }
 
-    const session = await executor.startSession(cwd).catch((err: unknown) => {
+    const persistent = threadId === this.orchestratorId;
+    const profile = persistent ? "orchestrator" : "agents";
+    const session = await executor.startSession(cwd, profile).catch((err: unknown) => {
       this.emit({ type: "agent.error", threadId, message: errMessage(err) });
       return null;
     });
     if (!session) return;
-    const persistent = threadId === this.orchestratorId;
     const run: Run = { threadId, session, executor, harness, model, persistent, stopped: false, busy: false };
     this.runs.set(threadId, run);
 
@@ -442,9 +474,17 @@ export class Orchestrator {
             this.emit({ type: "tool.called", threadId, callId: evt.callId, tool: evt.tool, args: evt.args });
             break;
           case "toolResult":
-            this.emit({ type: "tool.result", threadId, callId: evt.callId, ok: evt.ok, result: evt.result });
+            this.emit({
+              type: "tool.result",
+              threadId,
+              callId: evt.callId,
+              ok: evt.ok,
+              result: evt.result,
+              ...(evt.truncated ? { truncated: true } : {}),
+            });
             break;
           case "usage":
+            run.lastUsage = evt.usage;
             this.emit({ type: "usage.updated", threadId, usage: evt.usage });
             break;
           case "error":
@@ -462,9 +502,34 @@ export class Orchestrator {
       this.markUnread(threadId);
       this.emit({ type: "agent.error", threadId, message: errMessage(err) });
     } finally {
+      if (run.persistent) {
+        await this.maybeCompact(run);
+        this.compactMemory();
+      }
       run.busy = false;
-      if (run.persistent) this.compactMemory();
     }
+  }
+
+  private async maybeCompact(run: Run): Promise<void> {
+    const usage = run.lastUsage;
+    if (!usage) return;
+    const used =
+      usage.total ??
+      usage.input + usage.output + (usage.reasoning ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
+    const limit = usage.contextLimit;
+    if (!limit || used < limit * 0.7) return;
+    run.lastUsage = undefined;
+    const compacted = run.executor.compact
+      ? await run.executor.compact(run.session, run.model).catch(() => false)
+      : false;
+    if (compacted) {
+      this.system(run.threadId, "Compacted the conversation to free context.", { level: "info" });
+      return;
+    }
+    run.session.externalId = undefined;
+    this.system(run.threadId, "Started a fresh session to free context. Earlier work is preserved in memory.", {
+      level: "info",
+    });
   }
 
   private markUnread(threadId: string): void {
@@ -489,36 +554,45 @@ export class Orchestrator {
 
   memoryWrite(text: string, tags: string[] = []): string {
     const note = this.deps.memory.writeNote(text, tags, "orchestrator");
-    return `Saved memory ${note.id}: ${note.text}`;
+    const tagText = note.tags.length ? ` (tags: ${note.tags.join(", ")})` : "";
+    return `Saved to memory${tagText}: "${note.text}"`;
   }
 
   memorySearch(query: string, limit = 10): string {
     const notes = this.deps.memory.search(query, limit);
-    if (!notes.length) return "No matching memories.";
-    return notes
-      .map((note) => `${note.id}${note.tags.length ? ` [${note.tags.join(", ")}]` : ""} ${note.text}`)
-      .join("\n");
+    if (!notes.length) return `No memories matched "${query}".`;
+    const rows = notes.map((note) => {
+      const tags = note.tags.length ? ` [${note.tags.join(", ")}]` : "";
+      return `• ${note.text.slice(0, 240)}${tags}`;
+    });
+    return `Found ${notes.length} ${notes.length === 1 ? "memory" : "memories"} for "${query}":\n${rows.join("\n")}`;
   }
 
-  memoryList(limit = 40): string {
+  memoryList(limit = 20): string {
     const notes = this.deps.memory.snapshot().notes.slice(-limit);
     if (!notes.length) return "No memories yet.";
-    return notes
-      .map((note) => `${note.id}${note.tags.length ? ` [${note.tags.join(", ")}]` : ""} ${note.text}`)
-      .join("\n");
+    const rows = notes.map((note) => {
+      const tags = note.tags.length ? ` [${note.tags.join(", ")}]` : "";
+      return `• ${note.text.slice(0, 240)}${tags}`;
+    });
+    return `${notes.length} recent ${notes.length === 1 ? "memory" : "memories"}:\n${rows.join("\n")}`;
   }
 
   agentRegistry(): string {
     const threads = this.listThreadViews().filter((thread) => thread.kind !== "orchestrator");
     if (!threads.length) return "No agents yet.";
-    return threads
-      .map((thread) => {
-        const last = [...thread.messages].reverse().find((m) => m.role === "assistant" && m.text.trim());
-        const parent = thread.parentId ? ` (parent ${thread.parentId})` : "";
-        const tail = last ? ` — ${last.text.replace(/\s+/g, " ").slice(0, 200)}` : "";
-        return `${thread.id} [${thread.status}] ${thread.title}${parent}${tail}`;
-      })
-      .join("\n");
+    const titles = new Map(threads.map((thread) => [thread.id, thread.title]));
+    const shown = threads.slice(-20);
+    const rows = shown.map((thread) => {
+      const last = [...thread.messages].reverse().find((m) => m.role === "assistant" && m.text.trim());
+      const parent = thread.parentId
+        ? ` — child of "${titles.get(thread.parentId) ?? "another agent"}"`
+        : "";
+      const tail = last ? `\n  latest: ${last.text.replace(/\s+/g, " ").slice(0, 120)}` : "";
+      return `• "${truncate(thread.title, 80)}" [${thread.status}]${parent}\n  id: ${thread.id}${tail}`;
+    });
+    const more = threads.length > shown.length ? `\n… and ${threads.length - shown.length} older` : "";
+    return `${threads.length} ${threads.length === 1 ? "agent" : "agents"}:\n${rows.join("\n")}${more}`;
   }
 
   async sendMessage(
@@ -679,23 +753,15 @@ export class Orchestrator {
   private async mergeThread(threadId: string): Promise<void> {
     const thread = this.findThread(threadId);
     if (!thread?.branch) {
-      this.emit({
-        type: "message.appended",
-        threadId,
-        messageId: uid("m"),
-        role: "system",
-        text: "Nothing to merge — this thread has no isolated branch.",
-      });
+      this.system(threadId, "Nothing to merge — this thread has no isolated branch.", { level: "warning" });
       return;
     }
     const res = await this.deps.worktrees.merge(thread.branch);
-    this.emit({
-      type: "message.appended",
+    this.system(
       threadId,
-      messageId: uid("m"),
-      role: "system",
-      text: res.ok ? `Merged ${thread.branch} into the workspace.` : `Merge failed: ${res.output || "unknown error"}`,
-    });
+      res.ok ? `Merged ${thread.branch} into the workspace.` : "Merge failed",
+      res.ok ? {} : { level: "warning", details: res.output || "Unknown error" },
+    );
   }
 
   private async setEnabled(target: "harness" | "mcp" | "skill", id: string, enabled: boolean): Promise<void> {
@@ -706,7 +772,13 @@ export class Orchestrator {
     } else {
       const server = this.deps.mcp.setEnabled(id, enabled);
       if (server) {
-        this.emit({ type: "mcp.status", name: server.name, status: server.status, tools: server.tools });
+        this.emit({
+          type: "mcp.status",
+          name: server.name,
+          status: server.status,
+          tools: server.tools,
+          ...(server.schemaChars !== undefined ? { schemaChars: server.schemaChars } : {}),
+        });
       }
     }
     await this.publishConfig();

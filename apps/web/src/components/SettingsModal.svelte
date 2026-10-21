@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Blocks, Plug, Sparkles, Download, ExternalLink } from "@lucide/svelte";
   import { session, type SettingsSection } from "../lib/session.svelte";
+  import { explainError } from "../lib/errorHints";
   import ProviderIcon from "./ProviderIcon.svelte";
 
   const sections: Array<{ id: SettingsSection; label: string; icon: typeof Blocks }> = [
@@ -52,6 +53,14 @@
       testResult = err instanceof Error ? err.message : String(err);
     } finally {
       testBusy = false;
+    }
+  };
+
+  const prettyResult = (text: string): string => {
+    try {
+      return JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      return text;
     }
   };
 </script>
@@ -136,15 +145,39 @@
           <h3>MCP Servers</h3>
           <div class="sub">
             {(session.config?.mcp ?? []).filter((s) => s.enabled).length} of {(session.config?.mcp ?? []).length} enabled.
+            Only servers shared with agents add their tool schemas to every request.
           </div>
           {#each session.config?.mcp ?? [] as s (s.name)}
+            {@const mcpError = s.status === "error" && s.error ? explainError(s.error) : null}
+            {@const schemaTokens = Math.round((s.schemaChars ?? 0) / 4)}
             <div class="srow">
               <div class="grow">
                 <div class="name">
                   {s.name}
                   <span class="badge" class:ok={s.status === "connected"} class:warn={s.status === "error"}>{s.status}</span>
                 </div>
-                <div class="detail">{s.transport} · {s.source} · {s.detail}{s.tools.length ? ` · ${s.tools.length} tools` : ""}</div>
+                <div class="detail">
+                  {s.transport} · {s.source} · {s.detail}{s.tools.length ? ` · ${s.tools.length} tools` : ""}{schemaTokens
+                    ? ` · ~${schemaTokens.toLocaleString()} tokens`
+                    : ""}
+                </div>
+                {#if mcpError}
+                  <div class="mcp-error">{mcpError.title} — {mcpError.hint}</div>
+                {/if}
+                <label class="route-toggle">
+                  <input
+                    type="checkbox"
+                    checked={s.route ?? false}
+                    disabled={!s.enabled}
+                    onchange={(e) => void session.setMcpRoute(s.name, e.currentTarget.checked)}
+                  />
+                  Share with agents
+                </label>
+                {#if s.route && schemaTokens > 20000}
+                  <div class="mcp-warn">
+                    Large tool schema — adds roughly {schemaTokens.toLocaleString()} tokens to every agent request.
+                  </div>
+                {/if}
               </div>
               {#if s.status === "connected"}
                 <button class="btn" onclick={() => toggleTest(s.name)}>Test</button>
@@ -167,7 +200,7 @@
                   <button class="btn" disabled={testBusy || !testToolName.trim()} onclick={() => void runTest(s.name)}>Run tool</button>
                 </div>
                 {#if testResult !== null}
-                  <pre class="test-out">{testResult}</pre>
+                  <pre class="test-out">{prettyResult(testResult)}</pre>
                 {/if}
               </div>
             {/if}

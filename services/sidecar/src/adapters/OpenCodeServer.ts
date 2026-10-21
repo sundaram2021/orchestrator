@@ -173,6 +173,14 @@ export class OpenCodeServer {
     await this.request("POST", `/session/${sessionID}/abort`).catch(() => undefined);
   }
 
+  async summarize(sessionID: string, model: ServerModel): Promise<boolean> {
+    const result = await this.request("POST", `/session/${sessionID}/summarize`, {
+      providerID: model.providerID,
+      modelID: model.modelID,
+    });
+    return result === true;
+  }
+
   async providerLimits(): Promise<Map<string, number>> {
     const limits = new Map<string, number>();
     try {

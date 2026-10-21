@@ -17,12 +17,24 @@ interface JsonRpcMessage {
   error?: { code?: number; message?: string; data?: unknown };
 }
 
+export interface McpToolInfo {
+  name: string;
+  schemaChars: number;
+}
+
 export interface McpConnection {
   initialize(): Promise<void>;
-  listTools(): Promise<string[]>;
+  listTools(): Promise<McpToolInfo[]>;
   callTool(name: string, args: Record<string, unknown>): Promise<string>;
   close(): void;
 }
+
+const toToolInfos = (result: unknown): McpToolInfo[] => {
+  const tools = (result as { tools?: Array<{ name?: string }> } | undefined)?.tools ?? [];
+  return tools
+    .filter((tool): tool is { name: string } => typeof tool.name === "string" && tool.name.length > 0)
+    .map((tool) => ({ name: tool.name, schemaChars: JSON.stringify(tool).length }));
+};
 
 const parseSse = (text: string): JsonRpcMessage[] => {
   const events: JsonRpcMessage[] = [];
@@ -117,10 +129,8 @@ class HttpConnection implements McpConnection {
     await this.post({ jsonrpc: "2.0", method: "notifications/initialized" }, false);
   }
 
-  async listTools(): Promise<string[]> {
-    const result = await this.request("tools/list", {});
-    const tools = (result as { tools?: Array<{ name?: string }> } | undefined)?.tools ?? [];
-    return tools.map((t) => t.name ?? "").filter(Boolean);
+  async listTools(): Promise<McpToolInfo[]> {
+    return toToolInfos(await this.request("tools/list", {}));
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<string> {
@@ -213,10 +223,8 @@ class StdioConnection implements McpConnection {
     this.write({ jsonrpc: "2.0", method: "notifications/initialized" });
   }
 
-  async listTools(): Promise<string[]> {
-    const result = await this.request("tools/list", {});
-    const tools = (result as { tools?: Array<{ name?: string }> } | undefined)?.tools ?? [];
-    return tools.map((t) => t.name ?? "").filter(Boolean);
+  async listTools(): Promise<McpToolInfo[]> {
+    return toToolInfos(await this.request("tools/list", {}));
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<string> {

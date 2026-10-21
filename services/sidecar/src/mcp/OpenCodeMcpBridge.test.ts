@@ -9,6 +9,7 @@ const server = (
   enabled: boolean,
   transport: LoadedMcpServer["transport"],
   source = "test",
+  route = enabled,
 ): LoadedMcpServer => ({
   config: {
     name,
@@ -18,6 +19,7 @@ const server = (
     tools: [],
     status: "disabled",
     enabled,
+    route,
   } satisfies McpServerConfig,
   transport,
 });
@@ -54,6 +56,27 @@ test("keeps disabled servers marked disabled so global config cannot re-enable t
     server("engram", false, { kind: "http", url: "https://www.engram-memory.com/mcp", headers: {} }),
   ]);
   assert.deepEqual(bridge.mcp.engram, { type: "remote", url: "https://www.engram-memory.com/mcp", enabled: false });
+});
+
+test("keeps enabled servers disabled in the bridge until they are routed", () => {
+  const bridge = buildBridgeConfig([
+    server("resend", true, { kind: "http", url: "https://mcp.resend.com/mcp", headers: {} }, "test", false),
+  ]);
+  assert.deepEqual(bridge.mcp.resend, {
+    type: "remote",
+    url: "https://mcp.resend.com/mcp",
+    enabled: false,
+  });
+});
+
+test("orchestrator profile disables every discovered server", () => {
+  const bridge = buildBridgeConfig(
+    [server("resend", true, { kind: "http", url: "https://mcp.resend.com/mcp", headers: {} })],
+    { orchestrator: { type: "remote", url: "http://127.0.0.1:4123/mcp", enabled: true } },
+    "orchestrator",
+  );
+  assert.equal(bridge.mcp.resend?.enabled, false);
+  assert.equal(bridge.mcp.orchestrator?.enabled, true);
 });
 
 test("skips servers without a transport that are already disabled", () => {

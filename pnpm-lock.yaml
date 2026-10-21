@@ -49,12 +49,18 @@ importers:
       '@tsconfig/svelte':
         specifier: ^5.0.4
         version: 5.0.8
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.5
       svelte:
         specifier: ^5.16.0
         version: 5.57.2
       svelte-check:
         specifier: ^4.1.1
         version: 4.7.6(picomatch@4.0.7)(svelte@5.57.2)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.15
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -83,9 +89,6 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.22.0
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
     devDependencies:
       '@types/cross-spawn':
         specifier: ^6.0.6

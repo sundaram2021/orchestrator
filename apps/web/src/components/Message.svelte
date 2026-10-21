@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { MessageView, ThreadView } from "@orchestrator/contracts";
-  import { Brain, ChevronDown, ChevronRight, User } from "@lucide/svelte";
+  import { Brain, ChevronDown, ChevronRight, User, AlertTriangle, AlertCircle } from "@lucide/svelte";
   import { fmtDuration } from "../lib/time";
   import { harnessOf, harnessName } from "../lib/session.svelte";
+  import { explainError } from "../lib/errorHints";
   import MarkdownPreview from "./MarkdownPreview.svelte";
   import ToolCall from "./ToolCall.svelte";
   import Logo from "./Logo.svelte";
@@ -58,7 +59,37 @@
 </script>
 
 {#if message.role === "system"}
-  <div class="msg sys">{message.text}</div>
+  {#if message.level === "error"}
+    {@const explanation = explainError(message.text)}
+    <div class="notice error">
+      <div class="notice-head"><AlertTriangle size={13} /><span>{explanation.title}</span></div>
+      <p class="notice-hint">{explanation.hint}</p>
+      <details class="notice-details">
+        <summary>Details</summary>
+        <pre>{message.text}</pre>
+      </details>
+    </div>
+  {:else if message.level === "warning"}
+    <div class="notice warn">
+      <div class="notice-head"><AlertCircle size={13} /><span>{message.text}</span></div>
+      {#if message.details}
+        <details class="notice-details">
+          <summary>Details</summary>
+          <pre>{message.details}</pre>
+        </details>
+      {/if}
+    </div>
+  {:else}
+    <div class="msg sys">
+      {message.text}
+      {#if message.details}
+        <details class="notice-details">
+          <summary>Details</summary>
+          <pre>{message.details}</pre>
+        </details>
+      {/if}
+    </div>
+  {/if}
 {:else if message.role === "user"}
   <div class="mrow user">
     <div class="msg user">{message.text}</div>
@@ -253,5 +284,67 @@
     40% {
       opacity: 1;
     }
+  }
+  .notice {
+    border-radius: 10px;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .notice.error {
+    border-color: color-mix(in srgb, var(--red) 34%, transparent);
+    background: color-mix(in srgb, var(--red) 7%, transparent);
+  }
+  .notice.warn {
+    border-color: color-mix(in srgb, var(--amber) 34%, transparent);
+    background: color-mix(in srgb, var(--amber) 7%, transparent);
+  }
+  .notice-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .notice.error .notice-head {
+    color: color-mix(in srgb, var(--red) 82%, var(--text));
+  }
+  .notice.warn .notice-head {
+    color: color-mix(in srgb, var(--amber) 82%, var(--text));
+  }
+  .notice-hint {
+    margin: 4px 0 0 20px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .notice-details {
+    margin: 6px 0 0 20px;
+  }
+  .msg.sys .notice-details {
+    margin-left: 0;
+  }
+  .notice-details summary {
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--faint);
+    user-select: none;
+  }
+  .notice-details summary:hover {
+    color: var(--muted);
+  }
+  .notice-details pre {
+    margin: 4px 0 0;
+    max-height: 220px;
+    overflow: auto;
+    padding: 7px 9px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 </style>

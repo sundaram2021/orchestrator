@@ -334,42 +334,6 @@ svg {
   padding: 12px 12px 8px;
   flex-shrink: 0;
 }
-.sb-ws {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 10px;
-}
-.sb-ws .glyph {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  flex-shrink: 0;
-}
-.sb-ws .info {
-  min-width: 0;
-  flex: 1;
-}
-.sb-ws .info .name {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sb-ws .info .sub {
-  font-size: 11px;
-  color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .newbtn {
   width: 100%;
   background: var(--accent);
@@ -584,8 +548,8 @@ svg {
   overflow: hidden;
 }
 .actions-menu {
-  position: absolute;
-  top: calc(100% + 6px);
+  position: fixed;
+  top: 0;
   right: 0;
   min-width: 190px;
   padding: 5px;
@@ -611,6 +575,13 @@ svg {
 }
 .actions-menu .aitem:hover {
   background: var(--surface-2);
+}
+.actions-menu .aitem:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.actions-menu .aitem:disabled:hover {
+  background: transparent;
 }
 .actions-menu .aitem.danger {
   color: var(--red);
@@ -1591,6 +1562,30 @@ svg {
 .badge.warn {
   color: var(--amber);
   border-color: rgba(224, 177, 95, 0.4);
+}
+.mcp-error {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--amber) 78%, var(--muted));
+}
+.route-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.route-toggle input {
+  accent-color: var(--accent);
+}
+.mcp-warn {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--amber) 78%, var(--muted));
 }
 .switch {
   position: relative;

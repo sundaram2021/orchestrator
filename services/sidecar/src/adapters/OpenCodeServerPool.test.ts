@@ -20,6 +20,7 @@ const makeFake = (created: FakeServer[]): ServerHandle => {
     createSession: async () => "ses_test",
     sendMessage: async () => undefined,
     abort: async () => undefined,
+    summarize: async () => true,
     subscribe: () => () => undefined,
     providerLimits: async () => new Map<string, number>(),
     dispose: async () => {
@@ -30,10 +31,20 @@ const makeFake = (created: FakeServer[]): ServerHandle => {
   return server;
 };
 
-const makePool = (idleMs = 20): { pool: OpenCodeServerPool; created: FakeServer[] } => {
+const makePool = (
+  idleMs = 20,
+): { pool: OpenCodeServerPool; created: FakeServer[]; profiles: string[] } => {
   const created: FakeServer[] = [];
-  const pool = new OpenCodeServerPool(() => makeFake(created), {}, { idleMs });
-  return { pool, created };
+  const profiles: string[] = [];
+  const pool = new OpenCodeServerPool(
+    (profile) => {
+      profiles.push(profile);
+      return makeFake(created);
+    },
+    () => ({}),
+    { idleMs },
+  );
+  return { pool, created, profiles };
 };
 
 test("acquire reuses one server per cwd", async () => {
@@ -45,6 +56,18 @@ test("acquire reuses one server per cwd", async () => {
   assert.equal(pool.size(), 1);
   pool.release("/a");
   pool.release("/a");
+});
+
+test("uses a separate server per MCP profile", async () => {
+  const { pool, created, profiles } = makePool();
+  const agents = await pool.acquire("/a", "agents");
+  const orchestrator = await pool.acquire("/a", "orchestrator");
+  assert.notEqual(agents, orchestrator);
+  assert.deepEqual(profiles, ["agents", "orchestrator"]);
+  assert.equal(created.length, 2);
+  assert.equal(pool.size(), 2);
+  await pool.drop("/a");
+  assert.equal(pool.size(), 0);
 });
 
 test("uses a separate server per cwd", async () => {

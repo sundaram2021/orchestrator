@@ -9,6 +9,7 @@ interface SettingsData {
   model?: ModelRef;
   harnesses: Overrides;
   mcp: Overrides;
+  mcpRoute: Overrides;
   skills: Overrides;
   updates: { autoUpdate?: boolean; includeMajor?: boolean };
 }
@@ -21,7 +22,7 @@ export class SettingsStore {
   }
 
   private load(): SettingsData {
-    const empty: SettingsData = { harnesses: {}, mcp: {}, skills: {}, updates: {} };
+    const empty: SettingsData = { harnesses: {}, mcp: {}, mcpRoute: {}, skills: {}, updates: {} };
     if (!this.file) return empty;
     try {
       const parsed = JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>;
@@ -30,6 +31,7 @@ export class SettingsStore {
         model: parsed.model as ModelRef | undefined,
         harnesses: asBoolRecord(parsed.harnesses),
         mcp: asBoolRecord(parsed.mcp),
+        mcpRoute: asBoolRecord(parsed.mcpRoute),
         skills: asBoolRecord(parsed.skills),
         updates: {
           autoUpdate: typeof updates.autoUpdate === "boolean" ? updates.autoUpdate : undefined,
@@ -75,6 +77,15 @@ export class SettingsStore {
 
   setMcp(name: string, enabled: boolean): void {
     this.data.mcp[name] = enabled;
+    this.write();
+  }
+
+  mcpRouted(name: string, fallback: boolean): boolean {
+    return this.data.mcpRoute[name] ?? fallback;
+  }
+
+  setMcpRoute(name: string, route: boolean): void {
+    this.data.mcpRoute[name] = route;
     this.write();
   }
 

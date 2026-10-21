@@ -4,6 +4,7 @@ import { connectHttp, connectStdio, type McpConnection } from "./McpClient.js";
 import { OpenCodeMcpBridge, type OpenCodeMcpEntry } from "./OpenCodeMcpBridge.js";
 import { SettingsStore } from "../config/SettingsStore.js";
 import { logger } from "../util/logger.js";
+import { errMessage } from "../util/coerce.js";
 
 const log = logger("mcp");
 
@@ -21,6 +22,7 @@ export class McpManager {
     this.servers = loadMcpServers();
     for (const server of this.servers) {
       server.config.enabled = this.settings.mcpEnabled(server.config.name, server.config.enabled);
+      server.config.route = this.settings.mcpRouted(server.config.name, server.config.route);
     }
     this.syncBridge();
   }
@@ -47,9 +49,20 @@ export class McpManager {
     return this.servers.find((s) => s.config.name === name);
   }
 
-  private update(config: McpServerConfig, status: McpStatus, tools?: string[]): void {
+  private update(
+    config: McpServerConfig,
+    status: McpStatus,
+    tools?: string[],
+    error?: string,
+    schemaChars?: number,
+  ): void {
     config.status = status;
-    if (tools) config.tools = tools;
+    if (tools) {
+      config.tools = tools;
+      if (schemaChars !== undefined) config.schemaChars = schemaChars;
+    }
+    if (error) config.error = error;
+    else delete config.error;
     for (const listener of this.listeners) listener(config);
   }
 
@@ -70,6 +83,15 @@ export class McpManager {
     return server.config;
   }
 
+  setRoute(name: string, route: boolean): McpServerConfig | undefined {
+    const server = this.find(name);
+    if (!server) return undefined;
+    server.config.route = route;
+    this.settings.setMcpRoute(name, route);
+    this.syncBridge();
+    return server.config;
+  }
+
   async connect(name: string): Promise<McpServerConfig | undefined> {
     const server = this.find(name);
     if (!server || !server.config.enabled) return server?.config;
@@ -82,15 +104,17 @@ export class McpManager {
         server.transport.kind === "http"
           ? await connectHttp(server.transport.url, server.transport.headers)
           : await connectStdio(server.transport.command, server.transport.args, server.transport.env);
-      const tools = await connection.listTools();
+      const infos = await connection.listTools();
+      const tools = infos.map((info) => info.name);
+      const schemaChars = infos.reduce((sum, info) => sum + info.schemaChars, 0);
       this.connections.get(name)?.close();
       this.connections.set(name, connection);
-      this.update(server.config, "connected", tools);
-      log.info(`${name} connected (${tools.length} tools)`);
+      this.update(server.config, "connected", tools, undefined, schemaChars);
+      log.info(`${name} connected (${tools.length} tools, ${schemaChars} schema chars)`);
     } catch (err) {
       this.connections.get(name)?.close();
       this.connections.delete(name);
-      this.update(server.config, "error", []);
+      this.update(server.config, "error", [], errMessage(err));
       log.warn(`${name} connection failed`, err instanceof Error ? err.message : err);
     }
     return server.config;
