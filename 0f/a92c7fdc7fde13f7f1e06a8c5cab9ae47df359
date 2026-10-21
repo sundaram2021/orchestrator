@@ -1,0 +1,33 @@
+services/sidecar/package.json
+  s_0dc3da93d59c81::t_bea2f7b55f404e 3
+apps/web/package.json
+  s_0dc3da93d59c81::t_bea2f7b55f404e 3
+package.json
+  s_0dc3da93d59c81::t_bea2f7b55f404e 3
+packages/contracts/package.json
+  s_0dc3da93d59c81::t_bea2f7b55f404e 3
+apps/desktop/src-tauri/Cargo.toml
+  s_0dc3da93d59c81::t_bea2f7b55f404e 3
+apps/desktop/package.json
+  s_0dc3da93d59c81::t_bea2f7b55f404e 3
+apps/desktop/src-tauri/tauri.conf.json
+  s_0dc3da93d59c81::t_bea2f7b55f404e 4
+apps/desktop/src-tauri/Cargo.lock
+  s_0dc3da93d59c81::t_443ec949bd6595 2096
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0fa92c7fdc7fde13f7f1e06a8c5cab9ae47df359",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
