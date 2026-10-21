@@ -1,0 +1,105 @@
+services/sidecar/src/adapters/OpenCodeAdapter.ts
+  s_0dc3da93d59c81::t_9bccf1a630a2e7 438,443-444
+  s_0dc3da93d59c81::t_8d2dd2b0e2a0c8 8
+  s_0dc3da93d59c81::t_edcb38947f92e0 139,144-145
+services/sidecar/src/adapters/HarnessAdapter.ts
+  s_0dc3da93d59c81::t_49b2630cf37a8d 14
+apps/web/src/app.css
+  s_0dc3da93d59c81::t_6b4d6d46ab3f4c 1595-1600
+apps/web/package.json
+  s_0dc3da93d59c81::t_a7697cd55a28cb 10,23,26
+services/sidecar/src/util/text.test.ts
+  s_0dc3da93d59c81::t_ce515bf699c063 1-39
+apps/web/src/lib/toolPresentation.test.ts
+  s_0dc3da93d59c81::t_8599cd2d15fb6f 1-127
+apps/web/src/lib/toolPresentation.ts
+  s_0dc3da93d59c81::t_ab7415ce805d1b 1-11,13-136,138-179,184,188-355
+  s_0dc3da93d59c81::t_9df1e1f5c14f28 137
+  s_0dc3da93d59c81::t_1e7896a2410794 180-183
+  s_0dc3da93d59c81::t_e62171683e6ebf 12
+  s_0dc3da93d59c81::t_9b680393ffb0be 185-187
+apps/web/src/lib/errorHints.test.ts
+  s_0dc3da93d59c81::t_bf564476c5b1ab 1-35
+services/sidecar/src/adapters/AntigravityHarness.ts
+  s_0dc3da93d59c81::t_80e7955e087832 442,449
+  s_0dc3da93d59c81::t_edd60e0dfeab3c 517,523-524
+  s_0dc3da93d59c81::t_232a1aa21839e0 7
+  s_0dc3da93d59c81::t_b19798ba8bbea6 441,443-448,450-467
+  s_0dc3da93d59c81::t_1dc3f23056579a 494,499,504-505
+apps/web/src/lib/tools.ts
+  s_0dc3da93d59c81::t_b036cde75db802 16,18
+apps/web/src/components/ToolCall.svelte
+  s_0dc3da93d59c81::t_c74be77fdf88a2 3,6-7,11,15,20,26-50,58-64,67,71-72,74,81-82,84-85,89,91-97,99,113,115,117,122-135,211-225,252-300,362-363,365-366,368-375,377-390
+services/sidecar/src/mcp/OrchestratorMcpServer.ts
+  s_0dc3da93d59c81::t_2a38339d16790f 378-384
+  s_0dc3da93d59c81::t_dfd69586adb2f6 221,231-294,296,302-304
+  s_0dc3da93d59c81::t_ee2e5bd96a8188 320
+services/sidecar/src/event/ReadModel.ts
+  s_0dc3da93d59c81::t_0c6477db021b78 79-80
+  s_0dc3da93d59c81::t_321318c3cee652 127
+  s_0dc3da93d59c81::t_6f2eda1a6c1175 139
+apps/web/tsconfig.json
+  s_0dc3da93d59c81::t_0a5c37021fe6e1 13
+apps/web/src/lib/errorHints.ts
+  s_0dc3da93d59c81::t_e39b0766aea972 1-84
+packages/contracts/src/readmodel.ts
+  s_0dc3da93d59c81::t_ced8f79e3b9cfd 31-32
+  s_0dc3da93d59c81::t_702044f36f63b3 19
+  s_0dc3da93d59c81::t_ec5a43236640b4 4
+services/sidecar/src/Orchestrator.ts
+  s_0dc3da93d59c81::t_cba3dc84cff340 247,252,260-269,273-287
+  s_0dc3da93d59c81::t_df3d6b684a0949 10
+  s_0dc3da93d59c81::t_259d9b5864c4d5 216,218-220,228,230-232
+  s_0dc3da93d59c81::t_ae71d13555812a 464-471
+  s_0dc3da93d59c81::t_72e7f4b0212338 518-519,524-529,535-539,545-554
+  s_0dc3da93d59c81::t_7f464516088bbd 715,719,721-723
+apps/web/src/lib/session.svelte.ts
+  s_0dc3da93d59c81::t_a18c174758a30a 15,206-207,255,302-307,468,486,497,527,558,588,674,711,721,732,742,770
+  s_0dc3da93d59c81::t_faad0c97b1ae36 617-621,629-633
+  s_0dc3da93d59c81::t_561994a68221e3 245
+  s_0dc3da93d59c81::t_3552ab953d6512 646-650,657-661,670-673,680,688,698,703
+apps/web/src/components/LiveStatus.svelte
+  s_0dc3da93d59c81::t_b8a9f2902669f5 36,39,43-44
+  s_0dc3da93d59c81::t_f9c0a8d80bc370 6-7
+  s_0dc3da93d59c81::t_888675f56ff813 22-25,27-28
+apps/web/src/components/Message.svelte
+  s_0dc3da93d59c81::t_3d1a8612868f2c 3,6
+  s_0dc3da93d59c81::t_118f431377e000 288-349
+  s_0dc3da93d59c81::t_edd30b52a6ca9f 62-92
+apps/web/src/components/SettingsModal.svelte
+  s_0dc3da93d59c81::t_dd1b2d6358c6ef 150,158-160
+  s_0dc3da93d59c81::t_eda4413a9dc197 58-65
+  s_0dc3da93d59c81::t_b58f9d32d1fc2d 4
+  s_0dc3da93d59c81::t_bace73824ef2ff 183
+packages/contracts/src/config.ts
+  s_0dc3da93d59c81::t_fa278bf9b73a68 46
+packages/contracts/src/events.ts
+  s_0dc3da93d59c81::t_e6010869ba3930 99
+  s_0dc3da93d59c81::t_0652a93e1cda31 67-68
+  s_0dc3da93d59c81::t_0e84ec0fe390c3 13-15
+services/sidecar/src/util/text.ts
+  s_0dc3da93d59c81::t_9f77b92287f0f2 23-24
+  s_0dc3da93d59c81::t_fef7edb5f9b940 1-22,25-32
+services/sidecar/src/mcp/McpManager.ts
+  s_0dc3da93d59c81::t_2cdd3073b6b300 7
+  s_0dc3da93d59c81::t_1fcdd09dea0c26 96
+  s_0dc3da93d59c81::t_d83d30899293b3 51,54-55
+pnpm-lock.yaml
+  s_0dc3da93d59c81::t_60fb68aad88895 52-54,61-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2c8053242b454469ac76b1d88137426252a0f271",
+  "prompts": {},
+  "sessions": {
+    "s_0dc3da93d59c81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebf09c489ffex8ILpp8rueWU8N",
+        "model": "unknown"
+      },
+      "human_author": "Sundaram Kumar Jha <jhasundaram@outlook.com>"
+    }
+  }
+}
