@@ -137,6 +137,7 @@ export const McpStatusChangedSchema = z.object({
   name: z.string(),
   status: McpStatusSchema,
   tools: z.array(z.string()),
+  schemaChars: z.number().optional(),
 });
 
 export const EventBodySchema = z.discriminatedUnion("type", [

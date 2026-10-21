@@ -7,7 +7,8 @@ import { uid } from "../util/ids.js";
 import { logger } from "../util/logger.js";
 import { cleanToolText } from "../util/text.js";
 import { parseOpenCodeModels } from "../models/catalog.js";
-import { openCodeBridgeConfig } from "../config/paths.js";
+import { openCodeBridgeConfigs } from "../config/paths.js";
+import type { McpProfile } from "../mcp/profile.js";
 import { OpenCodeServer, type ServerEvent, type ServerModel } from "./OpenCodeServer.js";
 import { OpenCodeServerPool, type ServerHandle } from "./OpenCodeServerPool.js";
 import type { HarnessAdapter, ProviderEvent, SessionHandle, TurnAttachment, TurnOptions } from "./HarnessAdapter.js";
@@ -16,10 +17,10 @@ const log = logger("adapter:opencode");
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const harnessEnv = (): NodeJS.ProcessEnv =>
-  existsSync(openCodeBridgeConfig)
-    ? { ...process.env, OPENCODE_CONFIG: openCodeBridgeConfig }
-    : process.env;
+const harnessEnv = (profile: McpProfile = "agents"): NodeJS.ProcessEnv => {
+  const path = openCodeBridgeConfigs[profile];
+  return existsSync(path) ? { ...process.env, OPENCODE_CONFIG: path } : process.env;
+};
 
 const parseModelRef = (model: string): { model: string; variant?: string } => {
   const hash = model.indexOf("#");
@@ -177,7 +178,10 @@ export class OpenCodeAdapter implements HarnessAdapter {
 
   private get pool(): OpenCodeServerPool {
     if (!this.poolInstance) {
-      this.poolInstance = new OpenCodeServerPool((env) => new OpenCodeServer(env), harnessEnv());
+      this.poolInstance = new OpenCodeServerPool(
+        (_profile, env) => new OpenCodeServer(env),
+        (profile) => harnessEnv(profile),
+      );
     }
     return this.poolInstance;
   }
@@ -213,8 +217,8 @@ export class OpenCodeAdapter implements HarnessAdapter {
     return parseOpenCodeModels(res.stdout).map((m) => ({ id: m.id, name: m.short }));
   }
 
-  async startSession(cwd: string): Promise<SessionHandle> {
-    return { id: uid("ses_"), cwd };
+  async startSession(cwd: string, mcpProfile: McpProfile = "agents"): Promise<SessionHandle> {
+    return { id: uid("ses_"), cwd, mcpProfile };
   }
 
   async interrupt(session: SessionHandle): Promise<void> {
@@ -223,8 +227,20 @@ export class OpenCodeAdapter implements HarnessAdapter {
       killTree(child);
       this.children.delete(session.id);
     }
-    const server = this.poolInstance?.peek(session.cwd);
+    const server = this.poolInstance?.peek(session.cwd, session.mcpProfile);
     if (session.externalId && server) await server.abort(session.externalId);
+  }
+
+  async compact(session: SessionHandle, model: string): Promise<boolean> {
+    const server = this.poolInstance?.peek(session.cwd, session.mcpProfile);
+    if (!server || !session.externalId) return false;
+    try {
+      const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 120_000));
+      return await Promise.race([server.summarize(session.externalId, toServerModel(model)), timeout]);
+    } catch (err) {
+      log.warn("opencode summarize failed", err instanceof Error ? err.message : err);
+      return false;
+    }
   }
 
   async disposeWorkspace(dir: string): Promise<void> {
@@ -267,7 +283,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
       for (const a of attachments ?? []) {
         if (a.path) args.push("-f", a.path);
       }
-      const child = spawnStream("opencode", args, { cwd: session.cwd, env: harnessEnv() });
+      const child = spawnStream("opencode", args, { cwd: session.cwd, env: harnessEnv(session.mcpProfile) });
       children.set(session.id, child);
 
       let buffer = "";
@@ -341,7 +357,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
     const modelRef = toServerModel(model);
 
     async function* serve(): AsyncGenerator<ProviderEvent> {
-      const server = await self.pool.acquire(session.cwd);
+      const server = await self.pool.acquire(session.cwd, session.mcpProfile);
 
       const queue: ServerEvent[] = [];
       let notify: (() => void) | null = null;
@@ -478,7 +494,7 @@ export class OpenCodeAdapter implements HarnessAdapter {
         yield { kind: "done" };
       } finally {
         unsub?.();
-        self.pool.release(session.cwd);
+        self.pool.release(session.cwd, session.mcpProfile);
       }
     }
 
@@ -497,11 +513,11 @@ export class OpenCodeAdapter implements HarnessAdapter {
     const self = this;
     async function* guarded(): AsyncGenerator<ProviderEvent> {
       try {
-        await self.pool.probe(session.cwd);
+        await self.pool.probe(session.cwd, session.mcpProfile);
       } catch (err) {
         self.liveServer = false;
         log.warn("opencode serve unavailable, falling back to run mode", err instanceof Error ? err.message : err);
-        await self.pool.drop(session.cwd).catch(() => undefined);
+        await self.pool.drop(session.cwd, session.mcpProfile).catch(() => undefined);
         yield* self.runTurn(session, prompt, model, options?.system, options?.attachments);
         return;
       }

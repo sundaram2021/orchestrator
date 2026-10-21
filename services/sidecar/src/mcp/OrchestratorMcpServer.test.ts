@@ -207,3 +207,29 @@ test("http handler serves initialize and tools/list over POST", async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test("thread_read caps messages and total output size", async () => {
+  const { api, threads } = makeStub();
+  const messages = Array.from({ length: 40 }, (_, i) =>
+    ({
+      id: `m${i}`,
+      role: i % 2 === 0 ? "user" : "assistant",
+      text: `message ${i} ${"x".repeat(2000)}`,
+      tools: [],
+    }) as ThreadView["messages"][number],
+  );
+  threads.set("th_long", {
+    id: "th_long",
+    title: "Long thread",
+    harness: "opencode",
+    model: "opencode/x",
+    status: "done",
+    createdAt: 0,
+    updatedAt: 0,
+    messages,
+  });
+  const out = await callOrchestratorTool(api, "thread_read", { thread_id: "th_long" });
+  assert.ok(out.length <= 12_100, `thread_read returned ${out.length} chars`);
+  assert.match(out, /message 39/);
+  assert.doesNotMatch(out, /message 0 /);
+});

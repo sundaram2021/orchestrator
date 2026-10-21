@@ -18,6 +18,7 @@ const server: McpServerConfig = {
   tools: ["search_issues"],
   status: "connected",
   enabled: true,
+  route: false,
 };
 
 const thread: ThreadView = {

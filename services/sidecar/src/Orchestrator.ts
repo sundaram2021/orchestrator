@@ -10,6 +10,7 @@ import type {
   MessageLevel,
   ReadModel as ReadModelData,
   ThreadView,
+  Usage,
 } from "@orchestrator/contracts";
 import { mkdir, writeFile } from "node:fs/promises";
 import { errMessage } from "./util/coerce.js";
@@ -61,6 +62,7 @@ interface Run {
   persistent: boolean;
   stopped: boolean;
   busy: boolean;
+  lastUsage?: Usage;
 }
 
 export interface OrchestratorDeps {
@@ -117,7 +119,13 @@ export class Orchestrator {
     }
     this.ensureOrchestrator();
     this.deps.mcp.subscribe((server) => {
-      this.emit({ type: "mcp.status", name: server.name, status: server.status, tools: server.tools });
+      this.emit({
+        type: "mcp.status",
+        name: server.name,
+        status: server.status,
+        tools: server.tools,
+        ...(server.schemaChars !== undefined ? { schemaChars: server.schemaChars } : {}),
+      });
     });
     void this.deps.mcp.connectEnabled();
     log.info("orchestrator initialised");
@@ -326,6 +334,10 @@ export class Orchestrator {
       case "SetEnabled":
         await this.setEnabled(command.target, command.id, command.enabled);
         break;
+      case "SetMcpRoute":
+        this.deps.mcp.setRoute(command.name, command.route);
+        await this.publishConfig();
+        break;
       case "SetUpdateSettings":
         this.deps.config.setUpdateSettings({
           ...(command.autoUpdate !== undefined ? { autoUpdate: command.autoUpdate } : {}),
@@ -377,12 +389,13 @@ export class Orchestrator {
       return;
     }
 
-    const session = await executor.startSession(cwd).catch((err: unknown) => {
+    const persistent = threadId === this.orchestratorId;
+    const profile = persistent ? "orchestrator" : "agents";
+    const session = await executor.startSession(cwd, profile).catch((err: unknown) => {
       this.emit({ type: "agent.error", threadId, message: errMessage(err) });
       return null;
     });
     if (!session) return;
-    const persistent = threadId === this.orchestratorId;
     const run: Run = { threadId, session, executor, harness, model, persistent, stopped: false, busy: false };
     this.runs.set(threadId, run);
 
@@ -471,6 +484,7 @@ export class Orchestrator {
             });
             break;
           case "usage":
+            run.lastUsage = evt.usage;
             this.emit({ type: "usage.updated", threadId, usage: evt.usage });
             break;
           case "error":
@@ -488,9 +502,34 @@ export class Orchestrator {
       this.markUnread(threadId);
       this.emit({ type: "agent.error", threadId, message: errMessage(err) });
     } finally {
+      if (run.persistent) {
+        await this.maybeCompact(run);
+        this.compactMemory();
+      }
       run.busy = false;
-      if (run.persistent) this.compactMemory();
     }
+  }
+
+  private async maybeCompact(run: Run): Promise<void> {
+    const usage = run.lastUsage;
+    if (!usage) return;
+    const used =
+      usage.total ??
+      usage.input + usage.output + (usage.reasoning ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
+    const limit = usage.contextLimit;
+    if (!limit || used < limit * 0.7) return;
+    run.lastUsage = undefined;
+    const compacted = run.executor.compact
+      ? await run.executor.compact(run.session, run.model).catch(() => false)
+      : false;
+    if (compacted) {
+      this.system(run.threadId, "Compacted the conversation to free context.", { level: "info" });
+      return;
+    }
+    run.session.externalId = undefined;
+    this.system(run.threadId, "Started a fresh session to free context. Earlier work is preserved in memory.", {
+      level: "info",
+    });
   }
 
   private markUnread(threadId: string): void {
@@ -524,17 +563,17 @@ export class Orchestrator {
     if (!notes.length) return `No memories matched "${query}".`;
     const rows = notes.map((note) => {
       const tags = note.tags.length ? ` [${note.tags.join(", ")}]` : "";
-      return `• ${note.text}${tags}`;
+      return `• ${note.text.slice(0, 240)}${tags}`;
     });
     return `Found ${notes.length} ${notes.length === 1 ? "memory" : "memories"} for "${query}":\n${rows.join("\n")}`;
   }
 
-  memoryList(limit = 40): string {
+  memoryList(limit = 20): string {
     const notes = this.deps.memory.snapshot().notes.slice(-limit);
     if (!notes.length) return "No memories yet.";
     const rows = notes.map((note) => {
       const tags = note.tags.length ? ` [${note.tags.join(", ")}]` : "";
-      return `• ${note.text}${tags}`;
+      return `• ${note.text.slice(0, 240)}${tags}`;
     });
     return `${notes.length} recent ${notes.length === 1 ? "memory" : "memories"}:\n${rows.join("\n")}`;
   }
@@ -543,15 +582,17 @@ export class Orchestrator {
     const threads = this.listThreadViews().filter((thread) => thread.kind !== "orchestrator");
     if (!threads.length) return "No agents yet.";
     const titles = new Map(threads.map((thread) => [thread.id, thread.title]));
-    const rows = threads.map((thread) => {
+    const shown = threads.slice(-20);
+    const rows = shown.map((thread) => {
       const last = [...thread.messages].reverse().find((m) => m.role === "assistant" && m.text.trim());
       const parent = thread.parentId
         ? ` — child of "${titles.get(thread.parentId) ?? "another agent"}"`
         : "";
-      const tail = last ? `\n  latest: ${last.text.replace(/\s+/g, " ").slice(0, 200)}` : "";
-      return `• "${thread.title}" [${thread.status}]${parent}\n  id: ${thread.id}${tail}`;
+      const tail = last ? `\n  latest: ${last.text.replace(/\s+/g, " ").slice(0, 120)}` : "";
+      return `• "${truncate(thread.title, 80)}" [${thread.status}]${parent}\n  id: ${thread.id}${tail}`;
     });
-    return `${threads.length} ${threads.length === 1 ? "agent" : "agents"}:\n${rows.join("\n")}`;
+    const more = threads.length > shown.length ? `\n… and ${threads.length - shown.length} older` : "";
+    return `${threads.length} ${threads.length === 1 ? "agent" : "agents"}:\n${rows.join("\n")}${more}`;
   }
 
   async sendMessage(
@@ -731,7 +772,13 @@ export class Orchestrator {
     } else {
       const server = this.deps.mcp.setEnabled(id, enabled);
       if (server) {
-        this.emit({ type: "mcp.status", name: server.name, status: server.status, tools: server.tools });
+        this.emit({
+          type: "mcp.status",
+          name: server.name,
+          status: server.status,
+          tools: server.tools,
+          ...(server.schemaChars !== undefined ? { schemaChars: server.schemaChars } : {}),
+        });
       }
     }
     await this.publishConfig();

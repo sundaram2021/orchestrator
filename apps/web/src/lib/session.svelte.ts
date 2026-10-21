@@ -284,6 +284,7 @@ class Session {
         if (server) {
           server.status = e.status;
           if (e.tools.length) server.tools = e.tools;
+          if (e.schemaChars !== undefined) server.schemaChars = e.schemaChars;
         }
         break;
       }
@@ -334,6 +335,16 @@ class Session {
     await this.client.request("dispatchCommand", { kind: "StopAgent", threadId });
   }
 
+  async continueThread(threadId: string): Promise<void> {
+    const thread = this.threads.find((t) => t.id === threadId);
+    const lastUser = [...(thread?.messages ?? [])].reverse().find((m) => m.role === "user")?.text;
+    const task = thread?.prompt ?? lastUser ?? "";
+    const text = task
+      ? `Continue from where you left off.\n\nTask: ${task}`
+      : "Continue from where you left off.";
+    await this.client.request("dispatchCommand", { kind: "SendMessage", threadId, text });
+  }
+
   async clearFinished(): Promise<void> {
     await this.client.request("dispatchCommand", { kind: "ClearFinished" });
   }
@@ -365,6 +376,10 @@ class Session {
 
   async toggle(target: "harness" | "mcp" | "skill", id: string, enabled: boolean): Promise<void> {
     await this.client.request("dispatchCommand", { kind: "SetEnabled", target, id, enabled });
+  }
+
+  async setMcpRoute(name: string, route: boolean): Promise<void> {
+    await this.client.request("dispatchCommand", { kind: "SetMcpRoute", name, route });
   }
 
   async setUpdateSettings(patch: { autoUpdate?: boolean; includeMajor?: boolean }): Promise<void> {

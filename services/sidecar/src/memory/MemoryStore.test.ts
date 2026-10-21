@@ -105,3 +105,26 @@ test("render includes notes, agents, summary and recent conversation", () => {
   assert.match(text, /older request/);
   assert.doesNotMatch(text, /current request/);
 });
+
+test("render caps notes, agents and total size", () => {
+  const memory = new MemoryStore();
+  for (let i = 0; i < 50; i++) memory.writeNote(`note ${i} ${"x".repeat(400)}`, ["tag"]);
+  const orchestrator = thread({
+    kind: "orchestrator",
+    id: "th_orchestrator",
+    title: "Orchestrator",
+    messages: [message("u1", "user", "current request")],
+  });
+  const agents = Array.from({ length: 30 }, (_, i) =>
+    thread({
+      id: `th_${i}`,
+      title: `agent ${i} ${"y".repeat(200)}`,
+      updatedAt: i,
+      status: "running",
+      messages: [message(`m${i}`, "assistant", "z".repeat(500))],
+    }),
+  );
+  const text = memory.render(orchestrator, [orchestrator, ...agents]);
+  assert.ok(text.length <= 6000, `render was ${text.length} chars`);
+  assert.match(text, /memory trimmed/);
+});

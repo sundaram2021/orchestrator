@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ThreadView } from "@orchestrator/contracts";
-  import { Folder, Plus, Search, MoreHorizontal, Trash2, CornerDownRight } from "@lucide/svelte";
-  import { session, harnessOf, harnessName, runningCount } from "../lib/session.svelte";
+  import { Plus, Search, MoreHorizontal, Trash2, CornerDownRight } from "@lucide/svelte";
+  import { session, harnessOf, harnessName } from "../lib/session.svelte";
   import { relTime, statusLabel } from "../lib/time";
   import ProviderIcon from "./ProviderIcon.svelte";
   import ThreadActions from "./ThreadActions.svelte";
@@ -37,11 +37,6 @@
     for (const root of roots) (subtreeRunning(root) ? running : done).push(root);
     return { running, done };
   });
-  const wsName = $derived(
-    session.config?.workspace
-      ? (session.config.workspace.split(/[\\/]/).filter(Boolean).pop() ?? "")
-      : "no workspace",
-  );
   const dotClass = (s: string): string =>
     s === "running" ? "run" : s === "stopped" ? "stop" : s === "error" ? "err" : "";
 
@@ -62,9 +57,11 @@
       return;
     }
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const below = r.bottom + 340 < window.innerHeight;
-    const y = below ? `top:${r.bottom + 4}px` : `bottom:${window.innerHeight - r.top + 4}px`;
-    menuStyle = `${y};left:${r.right - 4}px;`;
+    const below = r.bottom + 280 < window.innerHeight;
+    const y = below
+      ? `top:${r.bottom + 4}px;bottom:auto`
+      : `top:auto;bottom:${window.innerHeight - r.top + 4}px`;
+    menuStyle = `${y};right:${Math.max(8, window.innerWidth - r.right)}px;`;
     menuFor = id;
   };
 </script>
@@ -73,15 +70,6 @@
 
 <aside class="sidebar">
   <div class="sb-head">
-    <div class="sb-ws">
-      <span class="glyph"><Folder size={14} /></span>
-      <div class="info">
-        <div class="name" title={session.config?.workspace ?? ""}>{wsName}</div>
-        <div class="sub">
-          {#if session.git?.available && session.git.branch}{session.git.branch} · {/if}{runningCount()} running
-        </div>
-      </div>
-    </div>
     <button class="newbtn" onclick={() => session.newAgent()}>
       <Plus size={15} />
       New agent
@@ -278,13 +266,5 @@
   }
   .mdot {
     color: var(--faint);
-  }
-  .card-menu {
-    position: fixed;
-    top: auto;
-    right: auto;
-    bottom: auto;
-    transform: translateX(-100%);
-    z-index: 900;
   }
 </style>

@@ -19,6 +19,12 @@ export const skillDirs = [
 export const runtimeDir = path.join(homeDir, ".orchestrator");
 
 export const openCodeBridgeConfig = path.join(runtimeDir, "opencode.merged.json");
+export const openCodeAgentConfig = path.join(runtimeDir, "opencode.agents.json");
+export const openCodeOrchestratorConfig = path.join(runtimeDir, "opencode.orchestrator.json");
+export const openCodeBridgeConfigs = {
+  agents: openCodeAgentConfig,
+  orchestrator: openCodeOrchestratorConfig,
+} as const;
 
 export const eventsDir = path.join(runtimeDir, "events");
 

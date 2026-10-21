@@ -1,7 +1,8 @@
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { LoadedMcpServer, McpTransportSpec } from "./mcpConfig.js";
-import { openCodeBridgeConfig } from "../config/paths.js";
+import { openCodeBridgeConfigs } from "../config/paths.js";
+import { MCP_PROFILES, type McpProfile } from "./profile.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("mcp:bridge");
@@ -45,12 +46,14 @@ export interface OpenCodeBridgeConfig {
 export function buildBridgeConfig(
   servers: LoadedMcpServer[],
   builtins: Record<string, OpenCodeMcpEntry> = {},
+  profile: McpProfile = "agents",
 ): OpenCodeBridgeConfig {
   const mcp: Record<string, OpenCodeMcpEntry> = {};
   for (const server of servers) {
-    if (server.transport) {
-      mcp[server.config.name] = toEntry(server.transport, server.config.enabled);
-    }
+    if (!server.transport) continue;
+    const enabled =
+      profile === "agents" ? server.config.enabled && server.config.route : false;
+    mcp[server.config.name] = toEntry(server.transport, enabled);
   }
   for (const [name, entry] of Object.entries(builtins)) {
     mcp[name] = entry;
@@ -59,36 +62,49 @@ export function buildBridgeConfig(
 }
 
 export class OpenCodeMcpBridge {
-  private lastJson = "";
-  private readonly path: string;
+  private readonly lastJson = new Map<McpProfile, string>();
+  private readonly paths: Record<McpProfile, string>;
   private readonly builtins = new Map<string, OpenCodeMcpEntry>();
 
-  constructor(path = openCodeBridgeConfig) {
-    this.path = path;
+  constructor(paths: Record<McpProfile, string> = openCodeBridgeConfigs) {
+    this.paths = paths;
   }
 
   setBuiltin(name: string, entry: OpenCodeMcpEntry): void {
     this.builtins.set(name, entry);
   }
 
-  sync(servers: LoadedMcpServer[]): string {
+  sync(servers: LoadedMcpServer[]): Record<McpProfile, string> {
+    for (const profile of MCP_PROFILES) {
+      this.write(profile, servers);
+    }
+    return this.paths;
+  }
+
+  private write(profile: McpProfile, servers: LoadedMcpServer[]): void {
+    const path = this.paths[profile];
     const payload = JSON.stringify(
-      buildBridgeConfig(servers, Object.fromEntries(this.builtins)),
+      buildBridgeConfig(servers, Object.fromEntries(this.builtins), profile),
       null,
       2,
     );
-    if (payload === this.lastJson) return this.path;
+    if (payload === this.lastJson.get(profile)) return;
     try {
-      mkdirSync(dirname(this.path), { recursive: true });
-      const tmp = `${this.path}.tmp`;
+      mkdirSync(dirname(path), { recursive: true });
+      const tmp = `${path}.tmp`;
       writeFileSync(tmp, payload, { mode: 0o600 });
-      renameSync(tmp, this.path);
-      this.lastJson = payload;
-      const enabled = servers.filter((s) => s.config.enabled && s.transport).length;
-      log.info(`routed ${enabled} MCP servers to OpenCode -> ${this.path}`);
+      renameSync(tmp, path);
+      this.lastJson.set(profile, payload);
+      const routed = servers.filter(
+        (server) => server.config.enabled && server.config.route && server.transport,
+      ).length;
+      log.info(
+        profile === "agents"
+          ? `routed ${routed} MCP servers to agents -> ${path}`
+          : `wrote orchestrator MCP profile -> ${path}`,
+      );
     } catch (err) {
-      log.warn(`failed to write ${this.path}`, err instanceof Error ? err.message : err);
+      log.warn(`failed to write ${path}`, err instanceof Error ? err.message : err);
     }
-    return this.path;
   }
 }

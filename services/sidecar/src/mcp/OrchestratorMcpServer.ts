@@ -76,7 +76,7 @@ export const ORCHESTRATOR_TOOLS: McpToolDef[] = [
   {
     name: "thread_list",
     description: "List threads, newest first, with id, status and title.",
-    inputSchema: obj({ limit: { type: "number", description: "Max rows (default 50)." } }),
+    inputSchema: obj({ limit: { type: "number", description: "Max rows (default 30)." } }),
   },
   {
     name: "thread_read",
@@ -143,7 +143,7 @@ export const ORCHESTRATOR_TOOLS: McpToolDef[] = [
   {
     name: "memory_list",
     description: "List the most recent orchestrator memory notes.",
-    inputSchema: obj({ limit: { type: "number", description: "Max notes (default 40)." } }),
+    inputSchema: obj({ limit: { type: "number", description: "Max notes (default 20)." } }),
   },
   {
     name: "agent_registry",
@@ -224,7 +224,7 @@ const summarize = (thread: ThreadView): string => {
   if (thread.status === "error") return `"${thread.title}" hit an error and stopped.`;
   if (thread.status === "stopped") return `"${thread.title}" was stopped before finishing.`;
   return last
-    ? `"${thread.title}" finished. ${last.text.trim().slice(0, 4000)}`
+    ? `"${thread.title}" finished. ${last.text.trim().slice(0, 1500)}`
     : `"${thread.title}" finished without producing any output.`;
 };
 
@@ -292,22 +292,28 @@ const formatCapabilities = (cap: ReturnType<OrchestratorApi["capabilities"]>): s
   return lines.join("\n");
 };
 
+const MAX_READ_MESSAGES = 30;
+const MAX_READ_CHARS = 12_000;
+
 const readThread = (thread: ThreadView, view: string): string => {
-  const lines = [`Thread "${thread.title}" [${thread.status}] (id ${thread.id})`];
-  for (const message of thread.messages) {
+  const header = `Thread "${thread.title}" [${thread.status}] (id ${thread.id})`;
+  const lines: string[] = [];
+  for (const message of thread.messages.slice(-MAX_READ_MESSAGES)) {
     if (view === "activity") {
-      if (message.reasoning?.trim()) lines.push(`\n[reasoning] ${message.reasoning.trim().slice(0, 1500)}`);
-      if (message.text.trim()) lines.push(`\n${message.role}: ${message.text.trim().slice(0, 2500)}`);
+      if (message.reasoning?.trim()) lines.push(`\n[reasoning] ${message.reasoning.trim().slice(0, 800)}`);
+      if (message.text.trim()) lines.push(`\n${message.role}: ${message.text.trim().slice(0, 1800)}`);
       for (const tool of message.tools) {
         const arg = toolArgBrief(tool.args);
         const state = tool.ok === false ? "failed" : tool.ok === true ? "ok" : "pending";
         lines.push(`  · ${humanTool(tool.tool)}${arg ? `: ${arg}` : ""} — ${state}`);
       }
     } else if (message.text.trim()) {
-      lines.push(`\n${message.role}: ${message.text.trim().slice(0, 2500)}`);
+      lines.push(`\n${message.role}: ${message.text.trim().slice(0, 1800)}`);
     }
   }
-  return lines.join("\n");
+  const body = lines.join("\n");
+  if (body.length <= MAX_READ_CHARS) return `${header}${body}`;
+  return `${header}\n… (older output trimmed)\n${body.slice(-(MAX_READ_CHARS - header.length - 32))}`;
 };
 
 export async function callOrchestratorTool(
@@ -373,7 +379,7 @@ export async function callOrchestratorTool(
     }
 
     case "thread_list": {
-      const limit = numArg(args, "limit") ?? 50;
+      const limit = numArg(args, "limit") ?? 30;
       const threads = api.listThreadViews();
       const titles = new Map(threads.map((thread) => [thread.id, thread.title]));
       const rows = threads.slice(0, Math.max(0, limit)).map((thread) => {
@@ -420,7 +426,7 @@ export async function callOrchestratorTool(
     }
 
     case "memory_list":
-      return api.memoryList(numArg(args, "limit") ?? 40);
+      return api.memoryList(numArg(args, "limit") ?? 20);
 
     case "agent_registry":
       return api.agentRegistry();

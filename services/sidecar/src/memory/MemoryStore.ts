@@ -36,10 +36,13 @@ interface MemoryData {
 }
 
 const MAX_NOTES = 200;
-const MAX_SUMMARY = 8000;
+const MAX_SUMMARY = 4000;
 const MAX_AGENTS = 100;
-const RENDERED_NOTES = 40;
-const RECENT_MESSAGES = 6;
+const RENDERED_NOTES = 16;
+const RENDERED_AGENTS = 12;
+const RECENT_MESSAGES = 4;
+const MAX_NOTE_CHARS = 240;
+const MAX_RENDER_CHARS = 6000;
 
 const empty = (): MemoryData => ({ notes: [], agents: {}, summary: "", compacted: 0, updatedAt: 0 });
 
@@ -127,7 +130,7 @@ export class MemoryStore {
   writeNote(text: string, tags: string[] = [], source: MemorySource = "orchestrator"): MemoryNote {
     const note: MemoryNote = {
       id: uid("note_"),
-      text: text.trim(),
+      text: text.trim().slice(0, 500),
       tags: tags.filter(Boolean),
       ts: Date.now(),
       source,
@@ -199,16 +202,20 @@ export class MemoryStore {
     if (notes.length) {
       lines.push("", "### Notes");
       for (const note of notes) {
-        lines.push(`- ${note.text}${note.tags.length ? ` [${note.tags.join(", ")}]` : ""}`);
+        const tags = note.tags.length ? ` [${note.tags.join(", ")}]` : "";
+        lines.push(`- ${note.text.slice(0, MAX_NOTE_CHARS)}${tags}`);
       }
     }
-    const agents = threads.filter((t) => t.kind !== "orchestrator");
+    const agents = threads
+      .filter((t) => t.kind !== "orchestrator")
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, RENDERED_AGENTS);
     if (agents.length) {
       lines.push("", "### Agents");
       for (const agent of agents) {
         const last = [...agent.messages].reverse().find((m) => m.role === "assistant" && m.text.trim());
-        const tail = last ? ` — ${oneLine(last.text).slice(0, 160)}` : "";
-        lines.push(`- ${agent.id} [${agent.status}] ${agent.title}${tail}`);
+        const tail = last ? ` — ${oneLine(last.text).slice(0, 100)}` : "";
+        lines.push(`- ${agent.id} [${agent.status}] ${agent.title.slice(0, 80)}${tail}`);
       }
     }
     const recent = thread.messages
@@ -216,8 +223,12 @@ export class MemoryStore {
       .slice(-RECENT_MESSAGES)
       .map((message) => ({ role: message.role, text: oneLine(message.text) }))
       .filter((message) => message.text && (message.role === "user" || message.role === "assistant"))
-      .map((message) => `${message.role}: ${message.text.slice(0, 300)}`);
+      .map((message) => `${message.role}: ${message.text.slice(0, MAX_NOTE_CHARS)}`);
     if (recent.length) lines.push("", "### Recent conversation", ...recent);
-    return lines.join("\n");
+    const text = lines.join("\n");
+    if (text.length <= MAX_RENDER_CHARS) return text;
+    const head = text.slice(0, 400);
+    const suffix = "\n… (memory trimmed)\n";
+    return `${head}${suffix}${text.slice(-(MAX_RENDER_CHARS - head.length - suffix.length))}`;
   }
 }

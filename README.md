@@ -11,7 +11,7 @@ A Tauri 2 desktop app with:
   - **Agent mode**: horizontal columns of independent agents + history sidebar.
 - An orchestrator chat dock that starts a **new independent agent per message**.
 - Direct control of OpenCode sessions; Antigravity used as model/MCP source (no headless agent API).
-- MCP servers (from Antigravity configs + opencode config + Engram) with tools routed into agent turns.
+- MCP servers (from Antigravity configs + opencode config + Engram), opt-in per server before their tools are routed into agent turns.
 - Global agent-skills (`SKILL.md`) discovered and injectable.
 - Git integration: status, diff, branch, one-click commit/PR.
 

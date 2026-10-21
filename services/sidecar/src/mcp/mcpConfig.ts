@@ -46,6 +46,7 @@ function fromOpenCode(file: string): LoadedMcpServer[] {
       tools: [],
       status: "disabled",
       enabled: entry.enabled ?? true,
+      route: false,
     };
     const transport: McpTransportSpec | null = isLocal
       ? command[0]
@@ -74,6 +75,7 @@ function fromAntigravity(file: string, source: string): LoadedMcpServer[] {
       tools: [],
       status: "disabled",
       enabled: true,
+      route: false,
     };
     const transport: McpTransportSpec | null = url
       ? { kind: "http", url, headers: asStringRecord(entry.headers) }
@@ -100,6 +102,7 @@ export function loadMcpServers(): LoadedMcpServer[] {
       tools: [],
       status: "disabled",
       enabled: false,
+      route: false,
     },
     transport: { kind: "http", url: "https://www.engram-memory.com", headers: {} },
   });

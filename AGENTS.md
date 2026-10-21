@@ -58,18 +58,37 @@ apps/desktop         Tauri 2 shell (Rust) — requires `rustup`/cargo
   (unit tests for EventStore, ReadModel projection, parseRunLine, model catalog, skills).
 
 ## MCP routing to agents (verified)
-- Antigravity-IDE / OpenCode MCP servers are made usable by agents via an **OpenCode config
-  bridge**: `McpManager` collects discovered servers and `OpenCodeMcpBridge` writes them
-  (`local`/`remote` shape, with an `enabled` flag) to `~/.orchestrator/opencode.merged.json`.
-- `OpenCodeAdapter` spawns `opencode run` with `OPENCODE_CONFIG` pointing at that file.
-  OpenCode **merges** it with the user's global config (verified), so injected servers appear
-  alongside native ones and `enabled:false` disables a globally-defined server.
-- The bridge file can contain tokens; it is written to the user home (outside the repo) with
-  mode 0600. Never copy it into the repo.
+- `McpManager` collects discovered servers and `OpenCodeMcpBridge` writes two profiles under
+  `~/.orchestrator/`: `opencode.agents.json` (routed servers + the built-in `orchestrator`
+  server) and `opencode.orchestrator.json` (only the built-in; every third-party server is
+  written with `enabled:false`).
+- **Third-party MCP is opt-in.** A server is injected into agents only when its `route` flag is
+  set (Settings → MCP → "Share with agents"). The flag defaults to `false`; `enabled` merely
+  controls the sidecar connection/Test panel. This prevents huge tool schemas (e.g. Resend:
+  137 tools, ~101k tokens) from consuming every request.
+- Both profile files list every discovered server with an explicit `enabled` value. OpenCode
+  **merges** the profile with the user's global config (verified), so omitting a server would
+  let the global entry re-enable it.
+- `OpenCodeAdapter` spawns `opencode serve`/`opencode run` with `OPENCODE_CONFIG` selected by
+  MCP profile. The orchestrator session uses the orchestrator profile; subagents use the agents
+  profile.
+- The bridge files can contain tokens; they are written to the user home (outside the repo) with
+  mode 0600. Never copy them into the repo.
 - `supabase`/`vercel` are OAuth servers and will read as `needs authentication` until the user
   runs `opencode mcp auth <name>`. This is expected, not a bridge bug.
 - Sidecar startup does **not** block on MCP connections (`connectEnabled` is fire-and-forget);
   status updates stream as `mcp.status` events.
+
+## Context budget (verified)
+- `McpClient.listTools()` records the serialized schema size; `McpServerConfig.schemaChars`
+  surfaces it in Settings next to the tool count (~chars/4 tokens). Servers above ~20k tokens
+  show a warning when shared with agents.
+- The orchestrator session auto-compacts after a turn when usage exceeds 70% of the model's
+  context window (`OpenCodeAdapter.compact` → `POST /session/:id/summarize`); if that fails it
+  rotates to a fresh OpenCode session and relies on the memory summary.
+- Orchestrator MCP reads are bounded: `thread_read` last 30 messages / 12k chars,
+  `agent_registry` 20 rows / 120-char tails, `summarize` 1.5k, `thread_list` 30,
+  `memory_list` 20. `MemoryStore.render` caps summary/notes/agents/recent at ~6k chars.
 
 ## OpenCode runtime (verified)
 - `OpenCodeServer` starts **one long-lived `opencode serve`** per workspace (port 0, parsed from
@@ -90,8 +109,8 @@ apps/desktop         Tauri 2 shell (Rust) — requires `rustup`/cargo
   `store.load()` and replays into the `ReadModel` before boot; old `running` threads are marked
   `stopped` on startup. Journals are per-workspace and can contain config snapshots (no secrets).
 - **User settings** persist to `~/.orchestrator/config.json` via `config/SettingsStore.ts`
-  (`model`, per-id `harnesses`/`mcp`/`skills` boolean overrides, and `updates.autoUpdate` /
-  `updates.includeMajor` — both default **on**). Re-applied after `config.assemble()` so toggles
+  (`model`, per-id `harnesses`/`mcp`/`skills` boolean overrides, `mcpRoute` opt-ins, and
+  `updates.autoUpdate` / `updates.includeMajor` — both default **on**). Re-applied after `config.assemble()` so toggles
   survive restart. `SettingsStore` with no file path is in-memory (used by unit tests). The
   `SetUpdateSettings` command updates them; they surface on `AppConfig.updates`. The live Tauri
   updater wiring/signing is intentionally deferred until a signed release endpoint exists.
@@ -104,9 +123,10 @@ apps/desktop         Tauri 2 shell (Rust) — requires `rustup`/cargo
   timeout), `McpClient` stdio `close()`, `runCapture` timeout, and `OpenCodeAdapter` run-mode /
   interrupt. `index.ts` shutdown calls `adapters.stopAll()` + `mcp.stopAll()`.
 - `OpenCodeAdapter` no longer holds one `serve` for the whole sidecar. `OpenCodeServerPool`
-  (`adapters/OpenCodeServerPool.ts`) keeps **one `opencode serve` per cwd** (worktree), reference
-  counted per turn (`acquire`/`release`), and **reaps idle servers** after 5 min with none active.
-  So parallel agents each get a serve rooted in their own worktree, and processes don't linger.
+  (`adapters/OpenCodeServerPool.ts`) keeps **one `opencode serve` per cwd + MCP profile**
+  (worktree), reference counted per turn (`acquire`/`release`), and **reaps idle servers** after
+  5 min with none active. So parallel agents each get a serve rooted in their own worktree, and
+  processes don't linger.
   `stop()` → `pool.disposeAll()`. Unit-tested with an injected factory (`OpenCodeServerPool.test.ts`).
 
 ## Multi-agent isolation (verified)

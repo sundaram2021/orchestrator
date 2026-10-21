@@ -41,6 +41,11 @@ export const CommandSchema = z.discriminatedUnion("kind", [
     enabled: z.boolean(),
   }),
   z.object({
+    kind: z.literal("SetMcpRoute"),
+    name: z.string(),
+    route: z.boolean(),
+  }),
+  z.object({
     kind: z.literal("SetUpdateSettings"),
     autoUpdate: z.boolean().optional(),
     includeMajor: z.boolean().optional(),
