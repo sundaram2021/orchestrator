@@ -425,12 +425,16 @@ export class OpenCodeAdapter implements HarnessAdapter {
                 const callId = part.callID;
                 const state = part.state ?? {};
                 if (!toolState.has(callId)) {
+                  const input = state.input;
+                  const hasInput =
+                    !!input && typeof input === "object" && Object.keys(input).length > 0;
+                  if (state.status === "pending" && !hasInput) break;
                   toolState.set(callId, "called");
                   yield {
                     kind: "tool",
                     callId,
                     tool: part.tool ?? "tool",
-                    args: JSON.stringify(state.input ?? {}),
+                    args: JSON.stringify(input ?? {}),
                   };
                 }
                 if ((state.status === "completed" || state.status === "error") && toolState.get(callId) !== "done") {

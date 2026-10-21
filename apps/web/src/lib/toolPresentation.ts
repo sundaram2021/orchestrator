@@ -57,6 +57,8 @@ const num = (value: unknown): number | undefined =>
 
 const countLines = (text: string): number => (text ? text.split("\n").length : 0);
 
+const lineLabel = (count: number): string => `${count} line${count === 1 ? "" : "s"}`;
+
 const firstLine = (text: string, max = 140): string => {
   const line = text.split("\n").map((part) => part.trim()).find(Boolean) ?? "";
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
@@ -112,7 +114,7 @@ const previewOf = (body: ToolBody): string => {
     case "none":
       return "";
     case "text":
-      return body.text ? `${countLines(body.text)} lines` : "";
+      return body.text ? lineLabel(countLines(body.text)) : "";
     case "records":
       return `${body.items.length} result${body.items.length === 1 ? "" : "s"}`;
     case "fields":
@@ -134,6 +136,8 @@ const diffCounts = (text: string): { added: number; removed: number } | null => 
 };
 
 const matchCount = (text: string): number => {
+  const found = /\bFound (\d+) match/i.exec(text);
+  if (found?.[1]) return Number(found[1]);
   if (/no matches|no results|0 matches/i.test(text)) return 0;
   const lines = text.split("\n").filter(Boolean);
   const hits = lines.filter((line) => /^.+?:\d+[:|-]/.test(line)).length;
@@ -234,7 +238,7 @@ export const describeTool = (tool: ToolView, ctx: ToolContext = {}): ToolPresent
         metaKeys.every((key) => ["filePath", "path", "lines", "bytes"].includes(key));
       const lines = num(meta?.lines);
       const bytes = num(meta?.bytes);
-      let preview = lines ? `${lines} lines` : previewOf(body);
+      let preview = lines ? lineLabel(lines) : previewOf(body);
       if (bytes) preview = `${preview} · ${formatBytes(bytes)}`;
       return {
         category,
